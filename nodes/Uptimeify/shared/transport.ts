@@ -146,7 +146,11 @@ export async function uptimeifyApiRequestAllItems(
 			const items = extractItems(response);
 			collected.push(...items);
 
-			cursor = (response as { nextCursor?: string | null }).nextCursor ?? undefined;
+			const nextCursor =
+				typeof response === 'object' && response !== null
+					? (response as { nextCursor?: unknown }).nextCursor
+					: undefined;
+			cursor = typeof nextCursor === 'string' ? nextCursor : undefined;
 			if (items.length === 0) break;
 		} while (cursor !== undefined && (limit === undefined || collected.length < limit));
 
