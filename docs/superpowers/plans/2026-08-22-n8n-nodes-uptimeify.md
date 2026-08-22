@@ -1032,3 +1032,608 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 6: Node-Gerüst und Ressource *Website*
+
+Diese Aufgabe legt den Vertrag fest, dem jede weitere Ressource folgt. Wer sie liest, bevor er
+Task 7 bis 16 baut, spart sich Rückfragen.
+
+**Files:**
+- Create: `nodes/Uptimeify/resources/website/index.ts`, `nodes/Uptimeify/resources/website/execute.ts`
+- Create: `nodes/Uptimeify/Uptimeify.node.ts`, `nodes/Uptimeify/Uptimeify.node.json`
+
+**Interfaces:**
+- Consumes: alles aus Task 4 und 5
+- Produces:
+  - `type ResourceExecute = (this: IExecuteFunctions, operation: string, itemIndex: number) => Promise<IDataObject | IDataObject[]>`
+  - je Ressource ein Modul mit `export const <name>Description: INodeProperties[]` und `export const execute<Name>: ResourceExecute`
+  - Der Node ruft `execute<Name>` auf und verpackt das Ergebnis selbst in `INodeExecutionData`. Eine Ressource gibt **rohe Objekte** zurück, nie `INodeExecutionData`.
+
+- [ ] **Step 1: Properties der Ressource Website schreiben**
+
+`nodes/Uptimeify/resources/website/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties, websiteLocator } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['website'], operation: [operation] });
+
+export const websiteDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['website'] } },
+		options: [
+			{ name: 'Change Status', value: 'changeStatus', action: 'Change a website status' },
+			{ name: 'Create', value: 'create', action: 'Create a website' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a website' },
+			{ name: 'Get', value: 'get', action: 'Get a website' },
+			{ name: 'Get Check History', value: 'getCheckHistory', action: 'Get website check history' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many websites' },
+			{ name: 'Get Uptime Stats', value: 'getUptimeStats', action: 'Get website uptime stats' },
+			{ name: 'Trigger Check', value: 'triggerCheck', action: 'Trigger a website check' },
+			{ name: 'Update', value: 'update', action: 'Update a website' },
+		],
+		default: 'getAll',
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Display name of the website, 1 to 255 characters',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'URL',
+		name: 'url',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. https://shop.example.com',
+		description: 'URL to monitor. Leave empty only for heartbeat monitors.',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('create') },
+		options: [
+			{
+				displayName: 'Allowed Check Country Codes',
+				name: 'allowedCheckCountryCodes',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. DE,FI,PL',
+				description:
+					'Comma-separated two-letter country codes the checks are restricted to. Empty means the organization default.',
+			},
+			{
+				displayName: 'Auth Mode',
+				name: 'authMode',
+				type: 'options',
+				options: [
+					{ name: 'None', value: 'none' },
+					{ name: 'Authorization Header', value: 'authorization_header' },
+					{ name: 'Basic', value: 'basic' },
+				],
+				default: 'none',
+			},
+			{
+				displayName: 'Authorization Header',
+				name: 'authorizationHeader',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+				description: 'Required when auth mode is Authorization Header',
+			},
+			{
+				displayName: 'Basic Auth Password',
+				name: 'basicAuthPassword',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{ displayName: 'Basic Auth Username', name: 'basicAuthUsername', type: 'string', default: '' },
+			{
+				displayName: 'Check Interval (Minutes)',
+				name: 'checkInterval',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+			{
+				displayName: 'Expected Status Codes',
+				name: 'expectedStatusCodes',
+				type: 'string',
+				default: '200,301,302',
+				description: 'Comma-separated list of HTTP status codes treated as up',
+			},
+			{ displayName: 'Follow Redirects', name: 'followRedirects', type: 'boolean', default: true },
+			{
+				displayName: 'HTTP Method',
+				name: 'httpMethod',
+				type: 'options',
+				options: [
+					{ name: 'DELETE', value: 'DELETE' },
+					{ name: 'GET', value: 'GET' },
+					{ name: 'HEAD', value: 'HEAD' },
+					{ name: 'OPTIONS', value: 'OPTIONS' },
+					{ name: 'PATCH', value: 'PATCH' },
+					{ name: 'POST', value: 'POST' },
+					{ name: 'PUT', value: 'PUT' },
+					{ name: 'QUERY', value: 'QUERY' },
+				],
+				default: 'GET',
+			},
+			{
+				displayName: 'Management Type',
+				name: 'managementType',
+				type: 'options',
+				options: [
+					{ name: 'Managed', value: 'managed' },
+					{ name: 'Self Service', value: 'self_service' },
+				],
+				default: 'managed',
+				description: 'Only organization admins may choose this',
+			},
+			{
+				displayName: 'Monitoring Type',
+				name: 'monitoringType',
+				type: 'options',
+				options: [
+					{ name: 'Combined', value: 'combined' },
+					{ name: 'DNS', value: 'dns' },
+					{ name: 'Heartbeat', value: 'heartbeat' },
+					{ name: 'HTTP Status', value: 'http_status' },
+					{ name: 'Playwright', value: 'playwright' },
+					{ name: 'SSL Check', value: 'ssl_check' },
+				],
+				default: 'combined',
+			},
+			{
+				displayName: 'Search Term',
+				name: 'searchTerm',
+				type: 'string',
+				default: '',
+				description: 'Keyword that has to appear in the response body',
+			},
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Maintenance', value: 'maintenance' },
+				],
+				default: 'active',
+			},
+			{
+				displayName: 'Timeout (Seconds)',
+				name: 'timeoutSeconds',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+		],
+	},
+
+	{
+		...websiteLocator,
+		displayOptions: {
+			show: {
+				resource: ['website'],
+				operation: [
+					'changeStatus',
+					'delete',
+					'get',
+					'getCheckHistory',
+					'getUptimeStats',
+					'triggerCheck',
+					'update',
+				],
+			},
+		},
+	},
+
+	{
+		displayName: 'Status',
+		name: 'status',
+		type: 'options',
+		options: [
+			{ name: 'Active', value: 'active' },
+			{ name: 'Inactive', value: 'inactive' },
+			{ name: 'Maintenance', value: 'maintenance' },
+		],
+		default: 'active',
+		required: true,
+		displayOptions: { show: show('changeStatus') },
+	},
+
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{
+				displayName: 'Check Interval (Minutes)',
+				name: 'checkInterval',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+			{ displayName: 'Expected Status Codes', name: 'expectedStatusCodes', type: 'string', default: '' },
+			{ displayName: 'Follow Redirects', name: 'followRedirects', type: 'boolean', default: true },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{ displayName: 'Search Term', name: 'searchTerm', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Maintenance', value: 'maintenance' },
+				],
+				default: 'active',
+			},
+			{
+				displayName: 'Timeout (Seconds)',
+				name: 'timeoutSeconds',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+			{ displayName: 'URL', name: 'url', type: 'string', default: '' },
+		],
+	},
+
+	...returnAllProperties('website', 'getAll'),
+	{
+		displayName: 'Filters',
+		name: 'filters',
+		type: 'collection',
+		placeholder: 'Add Filter',
+		default: {},
+		displayOptions: { show: show('getAll') },
+		options: [
+			{ ...customerLocator, required: false },
+			{
+				displayName: 'Monitoring Type',
+				name: 'monitoringType',
+				type: 'options',
+				options: [
+					{ name: 'Combined', value: 'combined' },
+					{ name: 'DNS', value: 'dns' },
+					{ name: 'Heartbeat', value: 'heartbeat' },
+					{ name: 'HTTP Status', value: 'http_status' },
+					{ name: 'Playwright', value: 'playwright' },
+					{ name: 'SSL Check', value: 'ssl_check' },
+				],
+				default: 'combined',
+			},
+			{
+				displayName: 'Search',
+				name: 'search',
+				type: 'string',
+				default: '',
+				description: 'Matches website and customer fields',
+			},
+		],
+	},
+
+	...returnAllProperties('website', 'getCheckHistory'),
+	{
+		displayName: 'Check Type',
+		name: 'checkType',
+		type: 'options',
+		options: [
+			{ name: 'Any', value: '' },
+			{ name: 'Combined', value: 'combined' },
+			{ name: 'DNS', value: 'dns' },
+			{ name: 'Heartbeat', value: 'heartbeat' },
+			{ name: 'HTTP Status', value: 'http_status' },
+			{ name: 'Playwright', value: 'playwright' },
+			{ name: 'SSL Check', value: 'ssl_check' },
+		],
+		default: '',
+		displayOptions: { show: show('getCheckHistory') },
+	},
+];
+```
+
+- [ ] **Step 2: `execute` der Ressource Website schreiben**
+
+`nodes/Uptimeify/resources/website/execute.ts`:
+
+```ts
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+
+export type ResourceExecute = (
+	this: IExecuteFunctions,
+	operation: string,
+	itemIndex: number,
+) => Promise<IDataObject | IDataObject[]>;
+
+export const executeWebsite: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const body: IDataObject = {
+			customerId: this.getNodeParameter('customerId', itemIndex, undefined, {
+				extractValue: true,
+			}) as string,
+			name: this.getNodeParameter('name', itemIndex) as string,
+			url: this.getNodeParameter('url', itemIndex) as string,
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+		};
+
+		if (typeof body.allowedCheckCountryCodes === 'string') {
+			const codes = body.allowedCheckCountryCodes
+				.split(',')
+				.map((code) => code.trim())
+				.filter((code) => code !== '');
+			body.allowedCheckCountryCodes = codes.length === 0 ? null : codes;
+		}
+
+		return (await uptimeifyApiRequest.call(this, 'POST', '/api/websites', body)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+		const filters = this.getNodeParameter('filters', itemIndex) as IDataObject;
+		const qs: IDataObject = { ...filters };
+
+		if (typeof qs.customerId === 'object' && qs.customerId !== null) {
+			qs.customerId = (qs.customerId as { value?: string }).value;
+		}
+
+		return await uptimeifyApiRequestAllItems.call(this, '/api/websites', qs, {
+			mode: 'page',
+			limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+		});
+	}
+
+	const websiteId = this.getNodeParameter('websiteId', itemIndex, undefined, {
+		extractValue: true,
+	}) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/websites/${websiteId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/websites/${websiteId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'changeStatus') {
+		const body: IDataObject = { status: this.getNodeParameter('status', itemIndex) as string };
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/websites/${websiteId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/websites/${websiteId}`);
+		return { success: true, websiteId };
+	}
+
+	if (operation === 'triggerCheck') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			`/api/websites/${websiteId}/trigger-check`,
+			{},
+		)) as IDataObject;
+	}
+
+	if (operation === 'getCheckHistory') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+		const checkType = this.getNodeParameter('checkType', itemIndex) as string;
+		const limit = returnAll ? 200 : (this.getNodeParameter('limit', itemIndex) as number);
+
+		const response = await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/websites/${websiteId}/check-history`,
+			undefined,
+			{ limit: Math.min(limit, 200), checkType },
+		);
+
+		const rows = (response as { data?: IDataObject[] }).data ?? [];
+		return returnAll ? rows : rows.slice(0, limit);
+	}
+
+	if (operation === 'getUptimeStats') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/websites/${websiteId}/uptime-stats`,
+		)) as IDataObject;
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for websites`,
+		{ itemIndex },
+	);
+};
+```
+
+**Hinweis zu `getCheckHistory`:** Dieser Endpunkt kennt keine Seiten, nur `limit` mit Maximum
+200. *Return All* liefert deshalb höchstens 200 Einträge — das steht so in der Beschreibung des
+Feldes und ist keine stille Kürzung.
+
+- [ ] **Step 3: Node-Klasse schreiben**
+
+`nodes/Uptimeify/Uptimeify.node.ts`:
+
+```ts
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+} from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { getCustomers } from './listSearch/getCustomers';
+import { getMonitors } from './listSearch/getMonitors';
+import { getTags } from './listSearch/getTags';
+import { getTeams } from './listSearch/getTeams';
+import { getWebsites } from './listSearch/getWebsites';
+import { websiteDescription } from './resources/website';
+import { executeWebsite, type ResourceExecute } from './resources/website/execute';
+
+const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
+	website: executeWebsite,
+};
+
+export class Uptimeify implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Uptimeify',
+		name: 'uptimeify',
+		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
+		group: ['input'],
+		version: 1,
+		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
+		description: 'Manage monitors, incidents and status pages in Uptimeify',
+		defaults: { name: 'Uptimeify' },
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		credentials: [{ name: 'uptimeifyApi', required: true }],
+		properties: [
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [{ name: 'Website', value: 'website' }],
+				default: 'website',
+			},
+			...websiteDescription,
+		],
+	};
+
+	methods = {
+		listSearch: {
+			getCustomers,
+			getMonitors,
+			getTags,
+			getTeams,
+			getWebsites,
+		},
+	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const resource = this.getNodeParameter('resource', i) as string;
+				const operation = this.getNodeParameter('operation', i) as string;
+				const executor = RESOURCE_EXECUTORS[resource];
+
+				if (executor === undefined) {
+					throw new NodeOperationError(this.getNode(), `Unknown resource "${resource}"`, {
+						itemIndex: i,
+					});
+				}
+
+				const result = await executor.call(this, operation, i);
+				const rows: IDataObject[] = Array.isArray(result) ? result : [result];
+
+				returnData.push(
+					...rows.map((row) => ({ json: row, pairedItem: { item: i } })),
+				);
+			} catch (error) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: { error: (error as Error).message },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
+				throw error;
+			}
+		}
+
+		return [returnData];
+	}
+}
+```
+
+- [ ] **Step 4: Node-Metadaten schreiben**
+
+`nodes/Uptimeify/Uptimeify.node.json`:
+
+```json
+{
+	"node": "n8n-nodes-base.uptimeify",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/haupt-pascal/n8n-nodes-uptimeify?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://uptimeify.io/docs/api"
+			}
+		]
+	}
+}
+```
+
+- [ ] **Step 5: Bauen und linten**
+
+Run: `npm run build && npm run lint`
+Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add nodes/Uptimeify
+git commit -m "feat: add Uptimeify node with the website resource
+
+Establishes the resource contract every later resource follows: index.ts holds
+the properties, execute.ts builds the request, the node itself only routes and
+wraps results into items.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
