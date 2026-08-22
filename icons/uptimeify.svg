@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Uptimeify "U" mark for LIGHT surfaces. Both shapes are copied verbatim from
+     img/uptimeify.io-01.svg - same path data, same colours. Only the canvas is
+     different: a square viewBox centred on the mark's measured bounding box, so
+     a client painting into a square tile does not letterbox a 2:1 wordmark.
+
+     Dark-surface counterpart: uptimeify-icon-dark.svg. This pair is what the MCP
+     server card declares as its light/dark icons, and it is the pair's only job:
+     the consumer picks a side.
+
+     It used to adapt inside the file, via prefers-color-scheme, back when one
+     asset had to serve as the whole favicon. That switch is gone deliberately.
+     Once the consumer picks the light half explicitly, a file that repaints
+     itself white because the OS is in dark mode renders a white U on light
+     chrome - invisible. The favicon role moved to img/uptimeify-tile.svg, which
+     brings its own opaque background and needs no switch at all. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="177.58 126.46 144.85 144.85" width="512" height="512" role="img" aria-label="Uptimeify">
+  <style type="text/css">
+    .st1 { fill: #42B1AE; }
+    .st2 { fill: #283048; }
+  </style>
+  <path class="st2" d="M272.87,211.62c0,9.57-7.76,17.32-17.32,17.32h-10.62c-9.57,0-17.32-7.76-17.32-17.32v-75.16h-32.85v72.01
+			c0,29.18,23.66,52.84,52.84,52.84h4.81c29.18,0,52.84-23.66,52.84-52.84v-42.03h-32.37V211.62z"/>
+  <polygon class="st1" points="270.79,136.46 305.24,166.43 305.24,136.46 		"/>
+</svg>

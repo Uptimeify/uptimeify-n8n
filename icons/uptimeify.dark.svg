@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Uptimeify "U" mark for DARK surfaces, isolated from img/uptimeify.io-02.svg.
+     The white U is the brand's own dark treatment - that file draws the same
+     mark in #FFFFFF - so this is the sanctioned variant, not a recolour of the
+     light one: both shapes are copied verbatim from their source. Only the
+     canvas differs: a square viewBox centred on the measured bounding box.
+     Light-surface counterpart: uptimeify-icon.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="177.34 126.03 145.32 145.32" width="512" height="512" role="img" aria-label="Uptimeify">
+  <style type="text/css">
+    .st0 { fill: #FFFFFF; }
+    .st1 { fill: #42B1AE; }
+  </style>
+  <path class="st0" d="M272.96,211.47c0,9.6-7.78,17.39-17.39,17.39h-10.66c-9.6,0-17.39-7.78-17.39-17.39v-75.44h-32.98v72.28
+  			c0,29.29,23.75,53.04,53.04,53.04h4.82c29.29,0,53.04-23.75,53.04-53.04v-42.19h-32.49V211.47z"/>
+<polygon class="st1" points="270.87,136.03 305.45,166.12 305.45,136.03 		"/>
+</svg>
