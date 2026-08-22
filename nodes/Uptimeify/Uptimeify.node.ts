@@ -12,11 +12,14 @@ import { getMonitors } from './listSearch/getMonitors';
 import { getTags } from './listSearch/getTags';
 import { getTeams } from './listSearch/getTeams';
 import { getWebsites } from './listSearch/getWebsites';
+import { monitorDescription } from './resources/monitor';
+import { executeMonitor } from './resources/monitor/execute';
 import { websiteDescription } from './resources/website';
 import { executeWebsite } from './resources/website/execute';
 import type { ResourceExecute } from './shared/types';
 
 const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
+	monitor: executeMonitor,
 	website: executeWebsite,
 };
 
@@ -40,9 +43,13 @@ export class Uptimeify implements INodeType {
 				name: 'resource',
 				type: 'options',
 				noDataExpression: true,
-				options: [{ name: 'Website', value: 'website' }],
+				options: [
+					{ name: 'Monitor', value: 'monitor' },
+					{ name: 'Website', value: 'website' },
+				],
 				default: 'website',
 			},
+			...monitorDescription,
 			...websiteDescription,
 		],
 	};

@@ -1,0 +1,398 @@
+import type { INodeProperties } from 'n8n-workflow';
+import {
+	customerLocator,
+	monitorLocator,
+	MONITOR_TYPE_OPTIONS,
+	returnAllProperties,
+} from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['monitor'], operation: [operation] });
+const showType = (monitorType: string, operations: string[]) => ({
+	resource: ['monitor'],
+	operation: operations,
+	monitorType: [monitorType],
+});
+
+const WRITE_OPERATIONS = ['create', 'update'];
+
+export const monitorDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['monitor'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a monitor' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a monitor' },
+			{ name: 'Get', value: 'get', action: 'Get a monitor' },
+			{ name: 'Get Alert History', value: 'getAlertHistory', action: 'Get monitor alert history' },
+			{ name: 'Get Check History', value: 'getCheckHistory', action: 'Get monitor check history' },
+			{
+				name: 'Get Incident History',
+				value: 'getIncidentHistory',
+				action: 'Get monitor incident history',
+			},
+			{ name: 'Get Many', value: 'getAll', action: 'Get many monitors' },
+			{ name: 'Trigger Check', value: 'triggerCheck', action: 'Trigger a monitor check' },
+			{ name: 'Update', value: 'update', action: 'Update a monitor' },
+		],
+		default: 'getAll',
+	},
+	{
+		displayName: 'Monitor Type',
+		name: 'monitorType',
+		type: 'options',
+		noDataExpression: true,
+		options: MONITOR_TYPE_OPTIONS,
+		default: 'icmp',
+		required: true,
+		description: 'Which kind of monitor to work with. It decides the endpoint that is called.',
+		displayOptions: { show: { resource: ['monitor'] } },
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Hostname',
+		name: 'hostname',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. mail.example.com',
+		description: 'Hostname or IP only, without a protocol and without a path',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Port',
+		name: 'port',
+		type: 'number',
+		default: 6379,
+		required: true,
+		typeOptions: { minValue: 1, maxValue: 65535 },
+		description: 'TCP monitors have no default port, so it has to be set',
+		displayOptions: { show: showType('tcp', ['create']) },
+	},
+
+	{
+		...monitorLocator,
+		displayOptions: {
+			show: {
+				resource: ['monitor'],
+				operation: [
+					'delete',
+					'get',
+					'getAlertHistory',
+					'getCheckHistory',
+					'getIncidentHistory',
+					'triggerCheck',
+					'update',
+				],
+			},
+		},
+	},
+
+	{
+		displayName: 'Common Fields',
+		name: 'commonFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['monitor'], operation: WRITE_OPERATIONS } },
+		options: [
+			{
+				displayName: 'Check Interval (Minutes)',
+				name: 'checkInterval',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 1440 },
+				default: 30,
+			},
+			{ displayName: 'Hostname', name: 'hostname', type: 'string', default: '' },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{
+				displayName: 'Port',
+				name: 'port',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 65535 },
+				default: 0,
+			},
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Disabled', value: 'disabled' },
+					{ name: 'Maintenance', value: 'maintenance' },
+				],
+				default: 'active',
+			},
+			{
+				displayName: 'Timeout (Seconds)',
+				name: 'timeoutSeconds',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+		],
+	},
+	{
+		displayName: 'Check Mode',
+		name: 'checkMode',
+		type: 'options',
+		options: [
+			{ name: 'Protocol', value: 'protocol' },
+			{ name: 'TCP', value: 'tcp' },
+		],
+		default: 'protocol',
+		description:
+			'TCP mode only checks that the port answers, so no credentials are needed or stored. IMAP/POP additionally needs an explicit port in TCP mode.',
+		displayOptions: {
+			show: {
+				resource: ['monitor'],
+				operation: WRITE_OPERATIONS,
+				monitorType: ['smtp', 'ssh', 'ftp', 'imap-pop'],
+			},
+		},
+	},
+
+	{
+		displayName: 'RR Types',
+		name: 'rrtypes',
+		type: 'multiOptions',
+		options: [
+			{ name: 'A', value: 'A' },
+			{ name: 'AAAA', value: 'AAAA' },
+			{ name: 'CNAME', value: 'CNAME' },
+			{ name: 'MX', value: 'MX' },
+			{ name: 'NS', value: 'NS' },
+			{ name: 'SOA', value: 'SOA' },
+			{ name: 'TXT', value: 'TXT' },
+		],
+		default: ['A'],
+		required: true,
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+	},
+	{
+		displayName: 'Match Mode',
+		name: 'matchMode',
+		type: 'options',
+		options: [
+			{ name: 'Contains', value: 'contains' },
+			{ name: 'Exact', value: 'exact' },
+		],
+		default: 'exact',
+		required: true,
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+	},
+	{
+		displayName: 'Expected Values',
+		name: 'expectedValues',
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: 'Add Expected Value',
+		default: {},
+		required: true,
+		description: 'Every RR type listed above needs at least one expected value',
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Value',
+				name: 'value',
+				values: [
+					{
+						displayName: 'RR Type',
+						name: 'rrtype',
+						type: 'string',
+						default: 'A',
+						placeholder: 'e.g. A',
+					},
+					{
+						displayName: 'Values',
+						name: 'values',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. 93.184.216.34, 93.184.216.35',
+						description: 'Comma-separated list of expected records',
+					},
+				],
+			},
+		],
+	},
+	{
+		displayName: 'DNS Options',
+		name: 'dnsOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Trigger on Mismatch',
+				name: 'mismatch',
+				type: 'boolean',
+				default: true,
+				description: 'Whether an answer that differs from the expected values raises an incident',
+			},
+			{
+				displayName: 'Trigger on Resolve Error',
+				name: 'resolveError',
+				type: 'boolean',
+				default: true,
+				description: 'Whether a failed resolution raises an incident',
+			},
+		],
+	},
+
+	{
+		displayName: 'ICMP Options',
+		name: 'icmpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('icmp', WRITE_OPERATIONS) },
+		options: [
+			{ displayName: 'Count', name: 'count', type: 'number', default: 4 },
+			{ displayName: 'Packet Size', name: 'packetSize', type: 'number', default: 56 },
+		],
+	},
+	{
+		displayName: 'TCP Options',
+		name: 'tcpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('tcp', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Expect Banner',
+				name: 'expectBanner',
+				type: 'string',
+				default: '',
+				description: 'String the service has to answer with',
+			},
+		],
+	},
+	{
+		displayName: 'SMTP Options',
+		name: 'smtpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('smtp', WRITE_OPERATIONS) },
+		options: [
+			{ displayName: 'Ignore TLS', name: 'ignoreTls', type: 'boolean', default: false },
+			{
+				displayName: 'Password',
+				name: 'pass',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{ displayName: 'Require TLS', name: 'requireTls', type: 'boolean', default: false },
+			{
+				displayName: 'Secure',
+				name: 'secure',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to connect over implicit TLS, which defaults the port to 465',
+			},
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'SSH Options',
+		name: 'sshOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('ssh', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Private Key',
+				name: 'privateKey',
+				type: 'string',
+				typeOptions: { password: true, rows: 4 },
+				default: '',
+			},
+			{ displayName: 'Username', name: 'username', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'FTP Options',
+		name: 'ftpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('ftp', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Secure',
+				name: 'secure',
+				type: 'options',
+				options: [
+					{ name: 'Explicit TLS', value: 'true' },
+					{ name: 'Implicit TLS', value: 'implicit' },
+					{ name: 'Plain FTP', value: 'false' },
+				],
+				default: 'false',
+			},
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'IMAP/POP Options',
+		name: 'imapPopOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('imap-pop', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Protocol',
+				name: 'protocol',
+				type: 'options',
+				options: [
+					{ name: 'IMAP', value: 'imap' },
+					{ name: 'POP3', value: 'pop3' },
+				],
+				default: 'imap',
+			},
+			{ displayName: 'TLS', name: 'tls', type: 'boolean', default: true },
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+
+	...returnAllProperties('monitor', 'getAll'),
+	...returnAllProperties('monitor', 'getCheckHistory'),
+	...returnAllProperties('monitor', 'getAlertHistory'),
+	...returnAllProperties('monitor', 'getIncidentHistory'),
+];
