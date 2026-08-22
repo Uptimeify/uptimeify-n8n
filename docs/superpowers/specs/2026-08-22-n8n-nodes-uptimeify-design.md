@@ -374,8 +374,10 @@ setzen den Item-Index im Fehler.
 
 ### Typen
 
-Response-Interfaces je Ressource in `shared/types.ts`. Kein `any`, keine
-`@typescript-eslint`-Ausnahmen ohne begründeten Kommentar.
+`shared/types.ts` trägt den Vertrag, dem jede Ressource folgt (`ResourceExecute`). Antwort-Typen
+stehen dort, wo sie gelesen werden — als schmale Interfaces neben der Funktion, die genau diese
+Felder braucht, nicht als vollständige Nachbildung der API. Kein `any`, keine
+`@typescript-eslint`-Ausnahme ohne begründenden Kommentar in derselben Zeile.
 
 ### Abhängigkeiten
 
