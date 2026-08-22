@@ -86,9 +86,8 @@ export class Uptimeify implements INodeType {
 					continue;
 				}
 
-				// `NodeOperationError`/`NodeApiError` return the same instance untouched when
-				// `error` is already one of their own kind, so re-wrapping by type is lossless
-				// for the errors a resource or the transport actually throws.
+				// Rewrap to satisfy the lint rule. Constructors return already-typed errors
+				// unchanged, so `itemIndex` only attaches to raw errors.
 				if (error instanceof NodeOperationError) {
 					throw new NodeOperationError(this.getNode(), error, { itemIndex: i });
 				}
