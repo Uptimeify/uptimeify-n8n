@@ -77,3 +77,251 @@ Request. Beide ändern sich zusammen und liegen deshalb nebeneinander. Der Node 
 beiden Exporte je Ressource und bleibt dadurch klein.
 
 ---
+### Task 1: Boilerplate entfernen, Paket-Metadaten, Test-Runner
+
+**Files:**
+- Delete: `nodes/GithubIssues/` (ganzes Verzeichnis), `credentials/GithubIssuesApi.credentials.ts`, `credentials/GithubIssuesOAuth2Api.credentials.ts`, `icons/github.svg`, `icons/github.dark.svg`
+- Create: `icons/uptimeify.svg`, `icons/uptimeify.dark.svg`, `vitest.config.ts`, `test/smoke.test.ts`
+- Modify: `package.json`, `tsconfig.json`
+
+**Interfaces:**
+- Consumes: nichts
+- Produces: `npm test` läuft Vitest; `icons/uptimeify.svg` und `icons/uptimeify.dark.svg` existieren und werden von Credential und Nodes referenziert
+
+- [ ] **Step 1: Boilerplate löschen**
+
+```bash
+rm -rf nodes/GithubIssues
+rm credentials/GithubIssuesApi.credentials.ts credentials/GithubIssuesOAuth2Api.credentials.ts
+rm icons/github.svg icons/github.dark.svg
+```
+
+- [ ] **Step 2: Icons übernehmen**
+
+```bash
+cp ~/dev/website-monitoring/monitoring-app/public/img/uptimeify-icon.svg icons/uptimeify.svg
+cp ~/dev/website-monitoring/monitoring-app/public/img/uptimeify-icon-dark.svg icons/uptimeify.dark.svg
+```
+
+Beide Dateien öffnen und prüfen: kein `<script>`, keine externen `href`/`xlink:href`, ein
+`viewBox` vorhanden. Fehlt `viewBox`, ergänzen — n8n skaliert das Icon sonst nicht.
+
+- [ ] **Step 3: `package.json` schreiben**
+
+```json
+{
+	"name": "@haupt-pascal/n8n-nodes-uptimeify",
+	"version": "0.1.0",
+	"description": "n8n nodes for Uptimeify: manage monitors, incidents and status pages, react to alerts, and run public network diagnostics",
+	"license": "MIT",
+	"homepage": "https://uptimeify.io",
+	"keywords": [
+		"n8n-community-node-package",
+		"uptimeify",
+		"monitoring",
+		"uptime",
+		"incident-management"
+	],
+	"author": {
+		"name": "Pascal Haupt",
+		"email": "pascal@haupt.design"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/haupt-pascal/n8n-nodes-uptimeify.git"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/UptimeifyApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Uptimeify/Uptimeify.node.js",
+			"dist/nodes/UptimeifyTrigger/UptimeifyTrigger.node.js",
+			"dist/nodes/UptimeifyTools/UptimeifyTools.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "*",
+		"eslint": "9.32.0",
+		"prettier": "3.6.2",
+		"release-it": "^19.0.4",
+		"typescript": "5.9.2",
+		"vitest": "^3.2.4"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}
+```
+
+- [ ] **Step 4: Tests aus dem Build ausschließen**
+
+In `tsconfig.json` neben `"include"` ergänzen:
+
+```json
+	"include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json"],
+	"exclude": ["test/**/*", "**/*.test.ts", "dist/**/*"]
+```
+
+- [ ] **Step 5: Vitest konfigurieren**
+
+`vitest.config.ts`:
+
+```ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+	test: {
+		include: ['test/**/*.test.ts'],
+		environment: 'node',
+	},
+});
+```
+
+- [ ] **Step 6: Rauchtest schreiben**
+
+`test/smoke.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import packageJson from '../package.json';
+
+describe('package manifest', () => {
+	it('has no runtime dependencies', () => {
+		expect((packageJson as { dependencies?: Record<string, string> }).dependencies).toBeUndefined();
+	});
+
+	it('registers three nodes and one credential', () => {
+		expect(packageJson.n8n.nodes).toHaveLength(3);
+		expect(packageJson.n8n.credentials).toHaveLength(1);
+	});
+});
+```
+
+- [ ] **Step 7: Abhängigkeiten installieren, Test laufen lassen**
+
+Run: `npm install && npm test`
+Expected: 2 Tests PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add -A
+git commit -m "chore: replace GitHub boilerplate with Uptimeify package metadata
+
+Removes the scaffold node and credentials, adds the Uptimeify icons, points
+package.json at the three planned nodes, and adds vitest for the pure helper
+functions. Tests stay out of the TypeScript build output.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
+
+### Task 2: Credential `UptimeifyApi`
+
+**Files:**
+- Create: `credentials/UptimeifyApi.credentials.ts`
+
+**Interfaces:**
+- Consumes: `icons/uptimeify.svg`, `icons/uptimeify.dark.svg` aus Task 1
+- Produces: Credential-Name `uptimeifyApi` mit den Feldern `apiToken: string` und `baseUrl: string`. Alle folgenden Tasks lesen die Base URL über `await this.getCredentials('uptimeifyApi')` und `credentials.baseUrl as string`.
+
+- [ ] **Step 1: Credential schreiben**
+
+`credentials/UptimeifyApi.credentials.ts`:
+
+```ts
+import type {
+	IAuthenticateGeneric,
+	ICredentialTestRequest,
+	ICredentialType,
+	Icon,
+	INodeProperties,
+} from 'n8n-workflow';
+
+export class UptimeifyApi implements ICredentialType {
+	name = 'uptimeifyApi';
+
+	displayName = 'Uptimeify API';
+
+	icon: Icon = { light: 'file:../icons/uptimeify.svg', dark: 'file:../icons/uptimeify.dark.svg' };
+
+	documentationUrl = 'https://uptimeify.io/docs/api/introduction/generate-api-token';
+
+	properties: INodeProperties[] = [
+		{
+			displayName: 'API Token',
+			name: 'apiToken',
+			type: 'string',
+			typeOptions: { password: true },
+			default: '',
+			required: true,
+			placeholder: 'wsm_...',
+			description:
+				'Create one under Settings, API tokens. Leave the customer field empty for an organization-wide token; Incident Management requires an organization-wide token',
+		},
+		{
+			displayName: 'Base URL',
+			name: 'baseUrl',
+			type: 'string',
+			default: 'https://uptimeify.io',
+			required: true,
+			description: 'Change this only if you use Uptimeify under your own white-label domain',
+		},
+	];
+
+	authenticate: IAuthenticateGeneric = {
+		type: 'generic',
+		properties: {
+			headers: {
+				Authorization: '=Bearer {{$credentials.apiToken}}',
+			},
+		},
+	};
+
+	test: ICredentialTestRequest = {
+		request: {
+			baseURL: '={{$credentials.baseUrl}}',
+			url: '/api/websites',
+			method: 'GET',
+			qs: { perPage: 1 },
+		},
+	};
+}
+```
+
+- [ ] **Step 2: Typprüfung**
+
+Run: `npx tsc --noEmit`
+Expected: keine Ausgabe, Exit-Code 0.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add credentials/UptimeifyApi.credentials.ts
+git commit -m "feat: add Uptimeify API credential
+
+Bearer token plus a configurable base URL for white-label deployments. The
+credential test hits GET /api/websites?perPage=1.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
