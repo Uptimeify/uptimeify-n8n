@@ -2973,3 +2973,294 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 9: Ressourcen *Incident* und *Status Page*
+
+**Files:**
+- Create: `nodes/Uptimeify/resources/incident/index.ts`, `.../incident/execute.ts`
+- Create: `nodes/Uptimeify/resources/statusPage/index.ts`, `.../statusPage/execute.ts`
+- Modify: `nodes/Uptimeify/Uptimeify.node.ts`
+
+**Interfaces:**
+- Consumes: `ResourceExecute`, `customerLocator`, `returnAllProperties`, Transport
+- Produces: `incidentDescription` / `executeIncident`, `statusPageDescription` / `executeStatusPage`
+
+- [ ] **Step 1: Ressource Incident schreiben**
+
+`nodes/Uptimeify/resources/incident/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['incident'], operation: [operation] });
+
+export const incidentDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['incident'] } },
+		options: [
+			{ name: 'Delete', value: 'delete', action: 'Delete a manual incident' },
+			{ name: 'Get', value: 'get', action: 'Get an incident' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many incidents' },
+		],
+		default: 'getAll',
+	},
+	{
+		displayName: 'Incident ID',
+		name: 'incidentId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['incident'], operation: ['delete', 'get'] } },
+	},
+	...returnAllProperties('incident', 'getAll'),
+	{
+		displayName: 'Source',
+		name: 'source',
+		type: 'options',
+		options: [
+			{ name: 'Any', value: '' },
+			{ name: 'Manual (Status Page)', value: 'manual' },
+			{ name: 'Monitor', value: 'monitor' },
+		],
+		default: '',
+		description:
+			'Manual incidents can be much older than the newest monitor incidents, so filtering keeps them from falling outside the window',
+		displayOptions: { show: show('getAll') },
+	},
+];
+```
+
+`nodes/Uptimeify/resources/incident/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeIncident: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+		const source = this.getNodeParameter('source', itemIndex) as string;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/incidents',
+			{ source },
+			{
+				mode: 'offset',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const incidentId = this.getNodeParameter('incidentId', itemIndex) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/incidents/${incidentId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/incidents/${incidentId}`);
+		return { success: true, incidentId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for incidents`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 2: Ressource Status Page schreiben**
+
+`nodes/Uptimeify/resources/statusPage/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['statusPage'], operation: [operation] });
+
+export const statusPageDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['statusPage'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a status page' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a status page' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many status pages' },
+			{ name: 'Update', value: 'update', action: 'Update a status page' },
+		],
+		default: 'getAll',
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Display name, 1 to 120 characters. The slug is derived from it.',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Status Page ID',
+		name: 'statusPageId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['statusPage'], operation: ['delete', 'update'] } },
+	},
+	{
+		displayName: 'Fields',
+		name: 'fields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['statusPage'], operation: ['create', 'update'] } },
+		options: [
+			{
+				displayName: 'Custom Domain Hostname',
+				name: 'customDomainHostname',
+				type: 'string',
+				default: '',
+				description: 'Creates a pending DNS verification record',
+			},
+			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{ displayName: 'Is Published', name: 'isPublished', type: 'boolean', default: true },
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
+				description: 'Only used when updating',
+			},
+			{ displayName: 'Show Recent Incidents', name: 'showRecentIncidents', type: 'boolean', default: false },
+			{
+				displayName: 'Show Recent Maintenance',
+				name: 'showRecentMaintenance',
+				type: 'boolean',
+				default: false,
+			},
+			{ displayName: 'Slug', name: 'slug', type: 'string', default: '' },
+			{
+				displayName: 'Visibility',
+				name: 'visibility',
+				type: 'options',
+				options: [
+					{ name: 'Customer Members Only', value: 'customer_members_only' },
+					{ name: 'Public', value: 'public' },
+				],
+				default: 'public',
+			},
+		],
+	},
+
+	...returnAllProperties('statusPage', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/statusPage/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeStatusPage: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const body: IDataObject = {
+			customerId: this.getNodeParameter('customerId', itemIndex, undefined, {
+				extractValue: true,
+			}) as string,
+			name: this.getNodeParameter('name', itemIndex) as string,
+			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+		};
+
+		return (await uptimeifyApiRequest.call(this, 'POST', '/api/status-pages', body)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/status-pages',
+			{},
+			{
+				mode: 'array',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const statusPageId = this.getNodeParameter('statusPageId', itemIndex) as string;
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/status-pages/${statusPageId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/status-pages/${statusPageId}`);
+		return { success: true, statusPageId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for status pages`,
+		{ itemIndex },
+	);
+};
+```
+
+**Hinweis:** `POST /api/status-pages` antwortet mit `{ statusPage: {...}, dns: null }`, nicht
+mit der Seite selbst. Das Ergebnis wird unverändert durchgereicht — der Workflow greift dann
+auf `$json.statusPage.id` zu. Das steht so im README.
+
+- [ ] **Step 3: Ressourcen im Node registrieren**
+
+Importe ergänzen, `RESOURCE_EXECUTORS` um `incident` und `statusPage` erweitern, die Optionen
+im `resource`-Property alphabetisch einsortieren, die Description-Arrays in `properties`
+aufnehmen.
+
+- [ ] **Step 4: Bauen und linten**
+
+Run: `npm run build && npm run lint`
+Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add nodes/Uptimeify
+git commit -m "feat: add incident and status page resources
+
+Incidents paginate with limit and offset. Only manual status-page incidents can
+be deleted; the API rejects the rest with notManualIncident, which the error
+mapper already explains.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
