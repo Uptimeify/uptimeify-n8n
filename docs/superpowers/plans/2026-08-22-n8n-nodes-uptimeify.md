@@ -3264,3 +3264,748 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 10: Ressourcen *Maintenance Window*, *Notification Channel*, *Tag*
+
+**Files:**
+- Create: `nodes/Uptimeify/resources/maintenanceWindow/index.ts`, `.../maintenanceWindow/execute.ts`
+- Create: `nodes/Uptimeify/resources/notificationChannel/index.ts`, `.../notificationChannel/execute.ts`
+- Create: `nodes/Uptimeify/resources/tag/index.ts`, `.../tag/execute.ts`
+- Modify: `nodes/Uptimeify/Uptimeify.node.ts`
+
+**Interfaces:**
+- Consumes: `ResourceExecute`, `customerLocator`, `tagLocator`, `returnAllProperties`, Transport
+- Produces: `maintenanceWindowDescription` / `executeMaintenanceWindow`, `notificationChannelDescription` / `executeNotificationChannel`, `tagDescription` / `executeTag`
+
+- [ ] **Step 1: Ressource Maintenance Window schreiben**
+
+`nodes/Uptimeify/resources/maintenanceWindow/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['maintenanceWindow'], operation: [operation] });
+const WRITE = ['create', 'previewOccurrences'];
+
+export const maintenanceWindowDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['maintenanceWindow'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a maintenance window' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a maintenance window' },
+			{ name: 'Get', value: 'get', action: 'Get a maintenance window' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many maintenance windows' },
+			{
+				name: 'Preview Occurrences',
+				value: 'previewOccurrences',
+				action: 'Preview maintenance window occurrences',
+			},
+			{ name: 'Update', value: 'update', action: 'Update a maintenance window' },
+		],
+		default: 'getAll',
+	},
+
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['maintenanceWindow'], operation: WRITE } },
+	},
+	{
+		displayName: 'Start Time',
+		name: 'startTime',
+		type: 'dateTime',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['maintenanceWindow'], operation: WRITE } },
+	},
+	{
+		displayName: 'End Time',
+		name: 'endTime',
+		type: 'dateTime',
+		default: '',
+		required: true,
+		description: 'Has to be after the start time',
+		displayOptions: { show: { resource: ['maintenanceWindow'], operation: WRITE } },
+	},
+	{
+		displayName: 'Targeting',
+		name: 'targeting',
+		type: 'options',
+		options: [
+			{ name: 'Customer', value: 'customer', description: 'Every monitor of one customer' },
+			{ name: 'Monitors', value: 'targets', description: 'An explicit list of monitors' },
+			{
+				name: 'Tags',
+				value: 'tags',
+				description: 'Every monitor across the organization carrying these tags',
+			},
+		],
+		default: 'targets',
+		required: true,
+		description: 'Exactly one targeting mode has to be used',
+		displayOptions: { show: { resource: ['maintenanceWindow'], operation: WRITE } },
+	},
+	{
+		...customerLocator,
+		displayOptions: {
+			show: {
+				resource: ['maintenanceWindow'],
+				operation: WRITE,
+				targeting: ['customer'],
+			},
+		},
+	},
+	{
+		displayName: 'Targets',
+		name: 'targets',
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: 'Add Target',
+		default: {},
+		displayOptions: {
+			show: { resource: ['maintenanceWindow'], operation: WRITE, targeting: ['targets'] },
+		},
+		options: [
+			{
+				displayName: 'Target',
+				name: 'target',
+				values: [
+					{
+						displayName: 'Type',
+						name: 'type',
+						type: 'options',
+						options: [
+							{ name: 'Customer Domain', value: 'customer_domain' },
+							{ name: 'Customer IP', value: 'customer_ip' },
+							{ name: 'DNS', value: 'dns' },
+							{ name: 'FTP', value: 'ftp' },
+							{ name: 'ICMP', value: 'icmp' },
+							{ name: 'IMAP/POP', value: 'imap_pop' },
+							{ name: 'SMTP', value: 'smtp' },
+							{ name: 'SSH', value: 'ssh' },
+							{ name: 'Website', value: 'website' },
+						],
+						default: 'website',
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						default: '',
+						description: 'Public UUID of the monitor. A numeric row ID is also accepted.',
+					},
+				],
+			},
+		],
+	},
+	{
+		displayName: 'Tag IDs',
+		name: 'tagIds',
+		type: 'string',
+		default: '',
+		placeholder: 'e.g. 7,12',
+		description: 'Comma-separated numeric tag IDs',
+		displayOptions: {
+			show: { resource: ['maintenanceWindow'], operation: WRITE, targeting: ['tags'] },
+		},
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['maintenanceWindow'], operation: WRITE } },
+		options: [
+			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
+			{ displayName: 'Is Recurring', name: 'isRecurring', type: 'boolean', default: false },
+		],
+	},
+
+	{
+		displayName: 'Maintenance Window ID',
+		name: 'maintenanceWindowId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: {
+			show: { resource: ['maintenanceWindow'], operation: ['delete', 'get', 'update'] },
+		},
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{ displayName: 'End Time', name: 'endTime', type: 'dateTime', default: '' },
+			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{ displayName: 'Start Time', name: 'startTime', type: 'dateTime', default: '' },
+		],
+	},
+
+	...returnAllProperties('maintenanceWindow', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/maintenanceWindow/execute.ts`:
+
+```ts
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+type TargetEntry = { type: string; id: string };
+
+/** Shared by Create and Preview Occurrences, which take the same body. */
+function buildWindowBody(context: IExecuteFunctions, itemIndex: number): IDataObject {
+	const body: IDataObject = {
+		name: context.getNodeParameter('name', itemIndex) as string,
+		startTime: context.getNodeParameter('startTime', itemIndex) as string,
+		endTime: context.getNodeParameter('endTime', itemIndex) as string,
+		...(context.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+	};
+
+	const targeting = context.getNodeParameter('targeting', itemIndex) as string;
+
+	if (targeting === 'customer') {
+		body.customerId = context.getNodeParameter('customerId', itemIndex, undefined, {
+			extractValue: true,
+		}) as string;
+	}
+
+	if (targeting === 'targets') {
+		const entries = ((context.getNodeParameter('targets', itemIndex) as IDataObject).target ??
+			[]) as unknown as TargetEntry[];
+		body.targets = entries.map((entry) => ({ type: entry.type, id: entry.id }));
+	}
+
+	if (targeting === 'tags') {
+		body.tagIds = (context.getNodeParameter('tagIds', itemIndex) as string)
+			.split(',')
+			.map((id) => id.trim())
+			.filter((id) => id !== '')
+			.map((id) => Number(id));
+	}
+
+	return body;
+}
+
+export const executeMaintenanceWindow: ResourceExecute = async function (
+	this,
+	operation,
+	itemIndex,
+) {
+	if (operation === 'create') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			'/api/maintenance-windows',
+			buildWindowBody(this, itemIndex),
+		)) as IDataObject;
+	}
+
+	if (operation === 'previewOccurrences') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			'/api/maintenance-windows/preview-occurrences',
+			buildWindowBody(this, itemIndex),
+		)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/maintenance-windows',
+			{},
+			{
+				mode: 'page',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const windowId = this.getNodeParameter('maintenanceWindowId', itemIndex) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/maintenance-windows/${windowId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/maintenance-windows/${windowId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/maintenance-windows/${windowId}`);
+		return { success: true, maintenanceWindowId: windowId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for maintenance windows`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 2: Ressource Notification Channel schreiben**
+
+`nodes/Uptimeify/resources/notificationChannel/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['notificationChannel'], operation: [operation] });
+
+export const notificationChannelDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['notificationChannel'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a notification channel' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a notification channel' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many notification channels' },
+			{ name: 'Test', value: 'test', action: 'Test a notification channel' },
+			{ name: 'Update', value: 'update', action: 'Update a notification channel' },
+		],
+		default: 'getAll',
+	},
+
+	{
+		displayName: 'Type',
+		name: 'type',
+		type: 'string',
+		default: 'webhook',
+		required: true,
+		placeholder: 'e.g. webhook, email, slack, pagerduty',
+		description:
+			'Direct types are email, sms and webhook. Integration types include slack, discord, teams, pagerduty, opsgenie, telegram, jira and more.',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Config',
+		name: 'config',
+		type: 'json',
+		default: '{}',
+		required: true,
+		description:
+			'Channel configuration. The fields depend on the type, e.g. { "url": "..." } for a webhook or { "secret": "https://hooks.slack.com/..." } for Slack.',
+		displayOptions: { show: { resource: ['notificationChannel'], operation: ['create', 'test'] } },
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('create') },
+		options: [
+			{
+				displayName: 'Category',
+				name: 'category',
+				type: 'options',
+				options: [
+					{ name: 'Direct', value: 'direct' },
+					{ name: 'Integration', value: 'integration' },
+				],
+				default: 'direct',
+			},
+			{ ...customerLocator, required: false },
+			{ displayName: 'Delay (Seconds)', name: 'delaySeconds', type: 'number', default: 0 },
+			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
+			{
+				displayName: 'Priority',
+				name: 'priority',
+				type: 'number',
+				default: 1,
+				description: 'Lower numbers are higher priority',
+			},
+		],
+	},
+
+	{
+		displayName: 'Channel ID',
+		name: 'channelId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['notificationChannel'], operation: ['delete', 'update'] } },
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{ displayName: 'Config (JSON)', name: 'config', type: 'json', default: '{}' },
+			{ displayName: 'Delay (Seconds)', name: 'delaySeconds', type: 'number', default: 0 },
+			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{ displayName: 'Priority', name: 'priority', type: 'number', default: 1 },
+		],
+	},
+	{
+		displayName: 'Type',
+		name: 'testType',
+		type: 'string',
+		default: 'webhook',
+		required: true,
+		description: 'Incident Management channels cannot be tested',
+		displayOptions: { show: show('test') },
+	},
+
+	...returnAllProperties('notificationChannel', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/notificationChannel/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+function parseJsonParameter(raw: unknown): IDataObject {
+	if (typeof raw !== 'string') return (raw ?? {}) as IDataObject;
+	return JSON.parse(raw) as IDataObject;
+}
+
+export const executeNotificationChannel: ResourceExecute = async function (
+	this,
+	operation,
+	itemIndex,
+) {
+	if (operation === 'create') {
+		const additional = this.getNodeParameter('additionalFields', itemIndex) as IDataObject;
+
+		if (typeof additional.customerId === 'object' && additional.customerId !== null) {
+			additional.customerId = (additional.customerId as { value?: string }).value;
+		}
+
+		const body: IDataObject = {
+			type: this.getNodeParameter('type', itemIndex) as string,
+			name: this.getNodeParameter('name', itemIndex) as string,
+			config: parseJsonParameter(this.getNodeParameter('config', itemIndex)),
+			...additional,
+		};
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			'/api/notification-channels',
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/notification-channels',
+			{},
+			{
+				mode: 'array',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	if (operation === 'test') {
+		const body: IDataObject = {
+			type: this.getNodeParameter('testType', itemIndex) as string,
+			config: parseJsonParameter(this.getNodeParameter('config', itemIndex)),
+		};
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			'/api/notification-channels/test',
+			body,
+		)) as IDataObject;
+	}
+
+	const channelId = this.getNodeParameter('channelId', itemIndex) as string;
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		if (body.config !== undefined) body.config = parseJsonParameter(body.config);
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/notification-channels/${channelId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/notification-channels/${channelId}`);
+		return { success: true, channelId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for notification channels`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 3: Ressource Tag schreiben**
+
+`nodes/Uptimeify/resources/tag/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { returnAllProperties, tagLocator } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['tag'], operation: [operation] });
+const ASSIGNMENT = ['assign', 'remove'];
+
+const COLOR_OPTIONS = [
+	{ name: 'Amber', value: 'amber' },
+	{ name: 'Blue', value: 'blue' },
+	{ name: 'Gray', value: 'gray' },
+	{ name: 'Green', value: 'green' },
+	{ name: 'Indigo', value: 'indigo' },
+	{ name: 'Pink', value: 'pink' },
+	{ name: 'Red', value: 'red' },
+	{ name: 'Slate', value: 'slate' },
+	{ name: 'Teal', value: 'teal' },
+	{ name: 'Violet', value: 'violet' },
+];
+
+export const tagDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['tag'] } },
+		options: [
+			{ name: 'Assign to Monitor', value: 'assign', action: 'Assign a tag to a monitor' },
+			{ name: 'Create', value: 'create', action: 'Create a tag' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a tag' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many tags' },
+			{ name: 'Remove From Monitor', value: 'remove', action: 'Remove a tag from a monitor' },
+			{ name: 'Update', value: 'update', action: 'Update a tag' },
+		],
+		default: 'getAll',
+	},
+
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Display label, at most 50 characters',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Color',
+		name: 'color',
+		type: 'options',
+		options: COLOR_OPTIONS,
+		default: 'blue',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+
+	{
+		...tagLocator,
+		displayOptions: {
+			show: { resource: ['tag'], operation: ['assign', 'delete', 'remove', 'update'] },
+		},
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{ displayName: 'Color', name: 'color', type: 'options', options: COLOR_OPTIONS, default: 'blue' },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+		],
+	},
+
+	{
+		displayName: 'Monitor Type',
+		name: 'assignMonitorType',
+		type: 'options',
+		options: [
+			{ name: 'Customer Domain', value: 'customer_domain' },
+			{ name: 'Customer IP', value: 'customer_ip' },
+			{ name: 'DNS', value: 'dns' },
+			{ name: 'FTP', value: 'ftp' },
+			{ name: 'ICMP', value: 'icmp' },
+			{ name: 'IMAP/POP', value: 'imap_pop' },
+			{ name: 'SMTP', value: 'smtp' },
+			{ name: 'SSH', value: 'ssh' },
+			{ name: 'TCP', value: 'tcp' },
+			{ name: 'Website', value: 'website' },
+		],
+		default: 'website',
+		required: true,
+		description:
+			'Use Customer Domain for domain expiry monitors and Customer IP for DNSBL monitors',
+		displayOptions: { show: { resource: ['tag'], operation: ASSIGNMENT } },
+	},
+	{
+		displayName: 'Monitor ID',
+		name: 'assignMonitorId',
+		type: 'number',
+		default: 0,
+		required: true,
+		description: 'Numeric monitor ID. This endpoint does not accept public UUIDs.',
+		displayOptions: { show: { resource: ['tag'], operation: ASSIGNMENT } },
+	},
+
+	...returnAllProperties('tag', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/tag/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeTag: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const body: IDataObject = {
+			name: this.getNodeParameter('name', itemIndex) as string,
+			color: this.getNodeParameter('color', itemIndex) as string,
+		};
+
+		return (await uptimeifyApiRequest.call(this, 'POST', '/api/tags', body)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/tags',
+			{},
+			{
+				mode: 'array',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const tagId = Number(
+		this.getNodeParameter('tagId', itemIndex, undefined, { extractValue: true }) as string | number,
+	);
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(this, 'PATCH', `/api/tags/${tagId}`, body)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/tags/${tagId}`);
+		return { success: true, tagId };
+	}
+
+	if (operation === 'assign' || operation === 'remove') {
+		const body: IDataObject = {
+			monitorType: this.getNodeParameter('assignMonitorType', itemIndex) as string,
+			monitorId: this.getNodeParameter('assignMonitorId', itemIndex) as number,
+			tagId,
+		};
+
+		if (operation === 'assign') {
+			return (await uptimeifyApiRequest.call(
+				this,
+				'POST',
+				'/api/monitor-tags',
+				body,
+			)) as IDataObject;
+		}
+
+		await uptimeifyApiRequest.call(this, 'DELETE', '/api/monitor-tags', body);
+		return { success: true, ...body };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for tags`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 4: Ressourcen im Node registrieren**
+
+Importe ergänzen, `RESOURCE_EXECUTORS` um `maintenanceWindow`, `notificationChannel` und `tag`
+erweitern, Optionen alphabetisch einsortieren, Description-Arrays in `properties` aufnehmen.
+
+- [ ] **Step 5: Bauen und linten**
+
+Run: `npm run build && npm run lint`
+Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add nodes/Uptimeify
+git commit -m "feat: add maintenance window, notification channel and tag resources
+
+Maintenance windows take exactly one targeting mode, so the node offers it as a
+choice instead of letting the API reject a mixed body. Tag assignment takes
+numeric ids only, which the field description states.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
