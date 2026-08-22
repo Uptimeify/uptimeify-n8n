@@ -138,7 +138,9 @@ Automatisierungs-Node ist das nutzlos.
 | Ressource | Operationen | Endpunkte |
 |---|---|---|
 | Website | Create, Get, Get Many, Update, Delete, Trigger Check, Change Status, Get Check History, Get Uptime Stats | `/api/websites`, `/api/websites/:websitePublicId`, `…/check-history`, `…/uptime-stats` |
-| Monitor | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History | `/api/{type}-monitors` (neun Typen) |
+| Monitor | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History | `/api/{type}-monitors` (sieben Typen) |
+| Customer Domain | Create, Get, Get Many, Update, Delete | `/api/customers/:id/domains`, `/api/customer-domains`, `/api/customer-domains/:id` |
+| Customer IP | Create, Get, Get Many, Update, Delete | `/api/customers/:id/ips`, `/api/customer-ips`, `/api/customer-ips/:id` |
 | Incident | Get, Get Many, Delete | `/api/incidents`, `/api/incidents/:id` |
 | Customer | Create, Get, Get Many, Update, Bulk Action, Get SMS Usage | `/api/customers`, `/api/customers/:customerPublicId`, `/api/customers/bulk`, `/api/customers/sms-usage` |
 | Status Page | Create, Get Many, Update, Delete | `/api/status-pages`, `/api/status-pages/:id` |
@@ -149,9 +151,19 @@ Automatisierungs-Node ist das nutzlos.
 | IM: On-Call | Who Is On Call, Get Teams, Get Schedules, Create Schedule Override | `/api/im/on-call`, `/api/im/teams`, `/api/im/schedules`, `…/:id/overrides` |
 
 Die Ressource *Monitor* trägt ein Pflichtfeld **Monitor Type** mit den Werten
-`dns`, `icmp`, `tcp`, `smtp`, `ssh`, `ftp`, `imap_pop`, `domain`, `dnsbl`. Der Wert bestimmt
-das Pfad-Präfix. Typ-spezifische Felder (z. B. `checkMode` für SSH/SMTP/FTP/IMAP-POP, `port`,
-`recordType` für DNS) erscheinen über `displayOptions` nur beim passenden Typ.
+`dns`, `icmp`, `tcp`, `smtp`, `ssh`, `ftp`, `imap-pop`. Der Wert bestimmt das Pfad-Präfix
+(`/api/dns-monitors` … `/api/imap-pop-monitors`) und den Namen des Konfigurationsobjekts im
+Request-Body (`dnsConfig`, `icmpConfig`, `config`, `smtpConfig`, `sshConfig`, `ftpConfig`,
+`imapPopConfig`). Typ-spezifische Felder (`checkMode` für SMTP/SSH/FTP/IMAP-POP, `port`,
+`dnsConfig.rrtypes`) erscheinen über `displayOptions` nur beim passenden Typ.
+
+**Korrektur gegenüber der ersten Fassung dieser Spec:** Endpunkte `/api/domain-monitors` und
+`/api/dnsbl-monitors` existieren nicht. Der Doku-Export `llms-full.txt` legt das nahe, das
+Routen-Verzeichnis `monitoring-app/server/api/` kennt sie nicht. Domain-Expiry läuft über
+*Customer Domains*, DNSBL über *Customer IPs* — beide sind oben als eigene Ressourcen
+aufgenommen, damit die zugesagte Abdeckung erhalten bleibt. Ebenso heißt der Pfad
+`/api/imap-pop-monitors` mit Bindestrich, nicht `/api/imap_pop-monitors`; der Unterstrich
+kommt nur in `monitorType`-Werten von `/api/monitor-tags` vor.
 
 ### Resource Locator
 
@@ -310,8 +322,16 @@ MCP-Endpunkt ist dokumentiert und liefert je Tool ein `outputSchema`.
 ### Pagination
 
 Listen-Operationen bekommen `returnAll` (boolean) und `limit` (number, sichtbar wenn
-`returnAll === false`). Bei `returnAll` lädt der Transport mit `perPage=200` (Maximum) in
-einer Schleife, bis `items.length < perPage` oder die Summe `total` erreicht ist.
+`returnAll === false`). Die API kennt drei Antwortformen, der Transport bedient alle drei:
+
+1. **Seiten-Pagination** — `{ items, total, page, perPage }`, Parameter `page`/`perPage`
+   (Maximum 200). Betrifft Websites, Maintenance Windows, Customer Domains, Customer IPs.
+2. **Cursor-Pagination** — `{ items, nextCursor }`, Parameter `limit` (Maximum 100) und
+   `cursor`. Betrifft `/api/im/incidents`. Der Cursor ist undurchsichtig und wird unverändert
+   zurückgeschickt.
+3. **Nacktes Array** — keine Pagination. Betrifft `/api/customers`, `/api/tags`,
+   `/api/notification-channels`, `/api/im/teams`, `/api/im/schedules`, `/api/im/on-call`.
+   Hier greift `limit` erst nach dem Empfang.
 
 ### Leere Query-Parameter
 
@@ -336,6 +356,10 @@ verständlicher Beschreibung:
 | `invalidCheckMode` | `checkMode` muss `protocol` oder `tcp` sein |
 | `notManualIncident` | Nur manuell angelegte Incidents sind löschbar |
 | `imAccessDenied` | Incident Management verlangt einen organisationsweiten Token |
+| `imTeamWriteDenied` | Schreibrecht auf dieses Team fehlt |
+| `imScheduleNotFound` | Schedule gehört nicht zu dieser Organisation |
+| `payloadTooLarge` | Event-Payload über 256 KB |
+| `payloadTooDeep` | Event-Payload tiefer als 20 Ebenen |
 | `imNotEnabled` | Incident Management ist für diese Organisation nicht aktiviert |
 | `invalidWindow` | `endTime` muss nach `startTime` liegen |
 
