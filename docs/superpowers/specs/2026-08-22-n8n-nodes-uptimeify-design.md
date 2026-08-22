@@ -325,13 +325,19 @@ Listen-Operationen bekommen `returnAll` (boolean) und `limit` (number, sichtbar 
 `returnAll === false`). Die API kennt drei Antwortformen, der Transport bedient alle drei:
 
 1. **Seiten-Pagination** — `{ items, total, page, perPage }`, Parameter `page`/`perPage`
-   (Maximum 200). Betrifft Websites, Maintenance Windows, Customer Domains, Customer IPs.
-2. **Cursor-Pagination** — `{ items, nextCursor }`, Parameter `limit` (Maximum 100) und
+   (Maximum 200). Betrifft Websites, Monitore, Maintenance Windows, Customer Domains,
+   Customer IPs.
+2. **Offset-Pagination** — nacktes Array, Parameter `limit` (Maximum 500) und `offset`.
+   Betrifft `/api/incidents`.
+3. **Cursor-Pagination** — `{ items, nextCursor }`, Parameter `limit` (Maximum 100) und
    `cursor`. Betrifft `/api/im/incidents`. Der Cursor ist undurchsichtig und wird unverändert
    zurückgeschickt.
-3. **Nacktes Array** — keine Pagination. Betrifft `/api/customers`, `/api/tags`,
+4. **Nacktes Array ohne Pagination** — `/api/customers`, `/api/tags`,
    `/api/notification-channels`, `/api/im/teams`, `/api/im/schedules`, `/api/im/on-call`.
    Hier greift `limit` erst nach dem Empfang.
+
+Die Verlaufs-Endpunkte (`check-history`, `alert-history`, `incident-history`) antworten mit
+`{ data: [...] }` statt `{ items: [...] }` und kennen nur `limit` (Maximum 200).
 
 ### Leere Query-Parameter
 
