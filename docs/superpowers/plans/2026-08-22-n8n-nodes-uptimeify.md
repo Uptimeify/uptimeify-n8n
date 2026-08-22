@@ -59,6 +59,7 @@ Unterendpunkte je Monitor: `POST /:id/trigger-check`, `GET /:id/check-history`,
 | Datei | Verantwortung |
 |---|---|
 | `credentials/UptimeifyApi.credentials.ts` | API-Token und Base URL, Auth-Header, Credential-Test |
+| `nodes/Uptimeify/shared/types.ts` | Der Vertrag `ResourceExecute`, dem jede Ressource folgt |
 | `nodes/Uptimeify/shared/errors.ts` | `data.code` → lesbare Meldung |
 | `nodes/Uptimeify/shared/transport.ts` | Ein Request, plus die drei Pagination-Formen |
 | `nodes/Uptimeify/shared/descriptions.ts` | Wiederverwendete Properties, Monitor-Tabellen |
@@ -1038,17 +1039,36 @@ Diese Aufgabe legt den Vertrag fest, dem jede weitere Ressource folgt. Wer sie l
 Task 7 bis 16 baut, spart sich Rückfragen.
 
 **Files:**
+- Create: `nodes/Uptimeify/shared/types.ts`
 - Create: `nodes/Uptimeify/resources/website/index.ts`, `nodes/Uptimeify/resources/website/execute.ts`
 - Create: `nodes/Uptimeify/Uptimeify.node.ts`, `nodes/Uptimeify/Uptimeify.node.json`
 
 **Interfaces:**
 - Consumes: alles aus Task 4 und 5
 - Produces:
-  - `type ResourceExecute = (this: IExecuteFunctions, operation: string, itemIndex: number) => Promise<IDataObject | IDataObject[]>`
+  - `nodes/Uptimeify/shared/types.ts` exportiert `type ResourceExecute = (this: IExecuteFunctions, operation: string, itemIndex: number) => Promise<IDataObject | IDataObject[]>`
   - je Ressource ein Modul mit `export const <name>Description: INodeProperties[]` und `export const execute<Name>: ResourceExecute`
   - Der Node ruft `execute<Name>` auf und verpackt das Ergebnis selbst in `INodeExecutionData`. Eine Ressource gibt **rohe Objekte** zurück, nie `INodeExecutionData`.
 
-- [ ] **Step 1: Properties der Ressource Website schreiben**
+- [ ] **Step 1: Ressourcen-Vertrag schreiben**
+
+`nodes/Uptimeify/shared/types.ts`:
+
+```ts
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+
+/**
+ * Every resource module exports one of these. It returns raw objects; wrapping them into
+ * `INodeExecutionData` and attaching `pairedItem` is the node's job, not the resource's.
+ */
+export type ResourceExecute = (
+	this: IExecuteFunctions,
+	operation: string,
+	itemIndex: number,
+) => Promise<IDataObject | IDataObject[]>;
+```
+
+- [ ] **Step 2: Properties der Ressource Website schreiben**
 
 `nodes/Uptimeify/resources/website/index.ts`:
 
@@ -1354,20 +1374,15 @@ export const websiteDescription: INodeProperties[] = [
 ];
 ```
 
-- [ ] **Step 2: `execute` der Ressource Website schreiben**
+- [ ] **Step 3: `execute` der Ressource Website schreiben**
 
 `nodes/Uptimeify/resources/website/execute.ts`:
 
 ```ts
-import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+import type { IDataObject } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
-
-export type ResourceExecute = (
-	this: IExecuteFunctions,
-	operation: string,
-	itemIndex: number,
-) => Promise<IDataObject | IDataObject[]>;
+import type { ResourceExecute } from '../../shared/types';
 
 export const executeWebsite: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
@@ -1491,7 +1506,7 @@ export const executeWebsite: ResourceExecute = async function (this, operation, 
 200. *Return All* liefert deshalb höchstens 200 Einträge — das steht so in der Beschreibung des
 Feldes und ist keine stille Kürzung.
 
-- [ ] **Step 3: Node-Klasse schreiben**
+- [ ] **Step 4: Node-Klasse schreiben**
 
 `nodes/Uptimeify/Uptimeify.node.ts`:
 
@@ -1510,7 +1525,8 @@ import { getTags } from './listSearch/getTags';
 import { getTeams } from './listSearch/getTeams';
 import { getWebsites } from './listSearch/getWebsites';
 import { websiteDescription } from './resources/website';
-import { executeWebsite, type ResourceExecute } from './resources/website/execute';
+import { executeWebsite } from './resources/website/execute';
+import type { ResourceExecute } from './shared/types';
 
 const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
 	website: executeWebsite,
@@ -1593,7 +1609,7 @@ export class Uptimeify implements INodeType {
 }
 ```
 
-- [ ] **Step 4: Node-Metadaten schreiben**
+- [ ] **Step 5: Node-Metadaten schreiben**
 
 `nodes/Uptimeify/Uptimeify.node.json`:
 
@@ -1618,12 +1634,12 @@ export class Uptimeify implements INodeType {
 }
 ```
 
-- [ ] **Step 5: Bauen und linten**
+- [ ] **Step 6: Bauen und linten**
 
 Run: `npm run build && npm run lint`
 Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add nodes/Uptimeify
