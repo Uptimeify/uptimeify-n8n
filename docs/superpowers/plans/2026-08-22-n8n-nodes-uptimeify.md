@@ -4438,3 +4438,395 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 12: Node `Uptimeify Trigger`
+
+**Files:**
+- Create: `nodes/UptimeifyTrigger/shared/signature.ts`, `nodes/UptimeifyTrigger/UptimeifyTrigger.node.ts`, `nodes/UptimeifyTrigger/UptimeifyTrigger.node.json`
+- Test: `test/signature.test.ts`
+
+**Interfaces:**
+- Consumes: `uptimeifyApiRequest` (Task 4), Credential `uptimeifyApi` (Task 2)
+- Produces:
+  - `isValidSignature(rawBody: Buffer | string, headerValue: unknown, secret: string): boolean`
+  - `createWebhookSecret(): string` — 32 zufällige Bytes, hex-kodiert
+
+- [ ] **Step 1: Failing test schreiben**
+
+`test/signature.test.ts`:
+
+```ts
+import crypto from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import { createWebhookSecret, isValidSignature } from '../nodes/UptimeifyTrigger/shared/signature';
+
+const SECRET = 'top-secret';
+const BODY = '{"type":"alert","incident_id":8094}';
+
+function sign(body: string, secret: string): string {
+	return crypto.createHmac('sha256', secret).update(body).digest('hex');
+}
+
+describe('isValidSignature', () => {
+	it('accepts a signature over the exact bytes', () => {
+		expect(isValidSignature(Buffer.from(BODY), sign(BODY, SECRET), SECRET)).toBe(true);
+	});
+
+	it('rejects a signature made with another secret', () => {
+		expect(isValidSignature(Buffer.from(BODY), sign(BODY, 'other'), SECRET)).toBe(false);
+	});
+
+	it('rejects a body that differs by whitespace', () => {
+		const reserialized = JSON.stringify(JSON.parse(BODY), null, 2);
+
+		expect(isValidSignature(Buffer.from(reserialized), sign(BODY, SECRET), SECRET)).toBe(false);
+	});
+
+	it('rejects a missing or malformed header without throwing', () => {
+		expect(isValidSignature(Buffer.from(BODY), undefined, SECRET)).toBe(false);
+		expect(isValidSignature(Buffer.from(BODY), '', SECRET)).toBe(false);
+		expect(isValidSignature(Buffer.from(BODY), 'short', SECRET)).toBe(false);
+		expect(isValidSignature(Buffer.from(BODY), ['a', 'b'], SECRET)).toBe(false);
+	});
+});
+
+describe('createWebhookSecret', () => {
+	it('returns 64 hex characters', () => {
+		expect(createWebhookSecret()).toMatch(/^[0-9a-f]{64}$/);
+	});
+
+	it('does not repeat itself', () => {
+		expect(createWebhookSecret()).not.toBe(createWebhookSecret());
+	});
+});
+```
+
+- [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
+
+Run: `npx vitest run test/signature.test.ts`
+Expected: FAIL, `Failed to resolve import "../nodes/UptimeifyTrigger/shared/signature"`.
+
+- [ ] **Step 3: Implementierung schreiben**
+
+`nodes/UptimeifyTrigger/shared/signature.ts`:
+
+```ts
+import crypto from 'node:crypto';
+
+/** 32 random bytes, hex encoded. Stored on the channel and in the workflow's static data. */
+export function createWebhookSecret(): string {
+	return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Uptimeify signs the exact bytes of the request body. Verify against the raw body, before any
+ * parse and re-serialization, otherwise whitespace differences break the comparison.
+ */
+export function isValidSignature(
+	rawBody: Buffer | string,
+	headerValue: unknown,
+	secret: string,
+): boolean {
+	if (typeof headerValue !== 'string' || headerValue === '') return false;
+
+	const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+	const a = Buffer.from(expected, 'utf8');
+	const b = Buffer.from(headerValue, 'utf8');
+
+	// timingSafeEqual throws on differing lengths, so the length check comes first.
+	return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+```
+
+- [ ] **Step 4: Test laufen lassen, Erfolg bestätigen**
+
+Run: `npx vitest run test/signature.test.ts`
+Expected: 6 Tests PASS.
+
+- [ ] **Step 5: Trigger-Node schreiben**
+
+`nodes/UptimeifyTrigger/UptimeifyTrigger.node.ts`:
+
+```ts
+import type {
+	IDataObject,
+	IHookFunctions,
+	INodeType,
+	INodeTypeDescription,
+	IWebhookFunctions,
+	IWebhookResponseData,
+} from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { extractItems, uptimeifyApiRequest } from '../Uptimeify/shared/transport';
+import { createWebhookSecret, isValidSignature } from './shared/signature';
+
+type ChannelRow = { id: number; config?: { url?: string } };
+
+export class UptimeifyTrigger implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Uptimeify Trigger',
+		name: 'uptimeifyTrigger',
+		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
+		group: ['trigger'],
+		version: 1,
+		description: 'Starts a workflow when Uptimeify raises or resolves an alert',
+		defaults: { name: 'Uptimeify Trigger' },
+		inputs: [],
+		outputs: [NodeConnectionTypes.Main],
+		credentials: [{ name: 'uptimeifyApi', required: true }],
+		webhooks: [
+			{
+				name: 'default',
+				httpMethod: 'POST',
+				responseMode: 'onReceived',
+				path: 'webhook',
+				rawBody: true,
+			},
+		],
+		properties: [
+			{
+				displayName: 'Scope',
+				name: 'scope',
+				type: 'options',
+				options: [
+					{ name: 'Organization', value: 'organization' },
+					{ name: 'Customer', value: 'customer' },
+					{ name: 'Website', value: 'website' },
+				],
+				default: 'organization',
+				description: 'Which monitors this webhook channel covers',
+			},
+			{
+				displayName: 'Customer ID',
+				name: 'customerId',
+				type: 'number',
+				default: 0,
+				required: true,
+				description: 'Numeric customer ID the channel is scoped to',
+				displayOptions: { show: { scope: ['customer', 'website'] } },
+			},
+			{
+				displayName: 'Website ID',
+				name: 'websiteId',
+				type: 'number',
+				default: 0,
+				required: true,
+				description: 'Numeric website ID for a website-level override',
+				displayOptions: { show: { scope: ['website'] } },
+			},
+			{
+				displayName: 'Source Channel ID',
+				name: 'sourceChannelId',
+				type: 'number',
+				default: 0,
+				required: true,
+				description: 'Parent channel a website-level override belongs to',
+				displayOptions: { show: { scope: ['website'] } },
+			},
+			{
+				displayName: 'Events',
+				name: 'events',
+				type: 'multiOptions',
+				options: [
+					{ name: 'Alert', value: 'alert' },
+					{ name: 'Recovery', value: 'recovery' },
+					{ name: 'Reminder', value: 'reminder' },
+					{ name: 'Slow', value: 'slow' },
+					{ name: 'Unstable', value: 'unstable' },
+					{ name: 'Warning', value: 'warning' },
+				],
+				default: [],
+				description: 'Which notification types start the workflow. Empty means all of them.',
+			},
+			{
+				displayName: 'Verify Signature',
+				name: 'verifySignature',
+				type: 'boolean',
+				default: true,
+				description:
+					'Whether to check the HMAC-SHA256 signature Uptimeify sends. Turn this off only behind a proxy that rewrites the request body.',
+			},
+		],
+	};
+
+	webhookMethods = {
+		default: {
+			async checkExists(this: IHookFunctions): Promise<boolean> {
+				const webhookData = this.getWorkflowStaticData('node');
+				const webhookUrl = this.getNodeWebhookUrl('default');
+
+				const response = await uptimeifyApiRequest.call(
+					this,
+					'GET',
+					'/api/notification-channels',
+				);
+
+				const match = (extractItems(response) as unknown as ChannelRow[]).find(
+					(channel) => channel.config?.url === webhookUrl,
+				);
+
+				if (match === undefined) return false;
+
+				webhookData.channelId = match.id;
+				return true;
+			},
+
+			async create(this: IHookFunctions): Promise<boolean> {
+				const webhookData = this.getWorkflowStaticData('node');
+				const webhookUrl = this.getNodeWebhookUrl('default');
+				const scope = this.getNodeParameter('scope') as string;
+				const secret = createWebhookSecret();
+
+				const body: IDataObject = {
+					type: 'webhook',
+					name: `n8n — ${this.getWorkflow().name ?? 'workflow'}`,
+					category: 'direct',
+					config: { url: webhookUrl, method: 'POST', secret, timeout: 30 },
+				};
+
+				if (scope === 'customer' || scope === 'website') {
+					body.customerId = this.getNodeParameter('customerId') as number;
+				}
+
+				if (scope === 'website') {
+					body.websiteId = this.getNodeParameter('websiteId') as number;
+					body.sourceChannelId = this.getNodeParameter('sourceChannelId') as number;
+				}
+
+				const created = (await uptimeifyApiRequest.call(
+					this,
+					'POST',
+					'/api/notification-channels',
+					body,
+				)) as { id?: number };
+
+				if (created.id === undefined) {
+					throw new NodeOperationError(
+						this.getNode(),
+						'Uptimeify did not return a channel ID for the new webhook channel',
+					);
+				}
+
+				webhookData.channelId = created.id;
+				webhookData.secret = secret;
+				return true;
+			},
+
+			async delete(this: IHookFunctions): Promise<boolean> {
+				const webhookData = this.getWorkflowStaticData('node');
+				const channelId = webhookData.channelId;
+
+				if (channelId === undefined) return true;
+
+				await uptimeifyApiRequest.call(
+					this,
+					'DELETE',
+					`/api/notification-channels/${String(channelId)}`,
+				);
+
+				delete webhookData.channelId;
+				delete webhookData.secret;
+				return true;
+			},
+		},
+	};
+
+	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+		const headers = this.getHeaderData();
+		const body = this.getBodyData();
+		const verifySignature = this.getNodeParameter('verifySignature') as boolean;
+		const events = this.getNodeParameter('events') as string[];
+
+		if (verifySignature) {
+			const webhookData = this.getWorkflowStaticData('node');
+			const secret = webhookData.secret;
+			const rawBody = this.getRequestObject().rawBody;
+
+			if (typeof secret !== 'string') {
+				throw new NodeOperationError(
+					this.getNode(),
+					'No signing secret is stored for this trigger. Deactivate and reactivate the workflow so the channel is recreated, or turn Verify Signature off.',
+				);
+			}
+
+			if (rawBody === undefined) {
+				throw new NodeOperationError(
+					this.getNode(),
+					'The raw request body is not available, so the signature cannot be checked. Turn Verify Signature off if a proxy in front of n8n rewrites the body.',
+				);
+			}
+
+			if (!isValidSignature(rawBody, headers['x-webhook-signature'], secret)) {
+				return { noWebhookResponse: true, webhookResponse: { status: 401 } };
+			}
+		}
+
+		const type = (body as { type?: string }).type;
+
+		if (events.length > 0 && (type === undefined || !events.includes(type))) {
+			return { noWebhookResponse: false, workflowData: [[]] };
+		}
+
+		return {
+			workflowData: [
+				[
+					{
+						json: {
+							...(body as IDataObject),
+							_headers: {
+								event: headers['x-webhook-event'],
+								attempt: headers['x-webhook-attempt'],
+								timestamp: headers['x-webhook-timestamp'],
+							},
+						},
+					},
+				],
+			],
+		};
+	}
+}
+```
+
+- [ ] **Step 6: Node-Metadaten schreiben**
+
+`nodes/UptimeifyTrigger/UptimeifyTrigger.node.json`:
+
+```json
+{
+	"node": "n8n-nodes-base.uptimeifyTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/haupt-pascal/n8n-nodes-uptimeify?tab=readme-ov-file#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://uptimeify.io/docs/integrations/webhooks"
+			}
+		]
+	}
+}
+```
+
+- [ ] **Step 7: Bauen, linten, Tests**
+
+Run: `npm run build && npm run lint && npm test`
+Expected: Build erfolgreich, Lint sauber, alle Tests PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add nodes/UptimeifyTrigger test/signature.test.ts
+git commit -m "feat: add the Uptimeify trigger node
+
+Registers itself as a webhook notification channel on activation, verifies the
+HMAC-SHA256 signature against the raw request body, and deletes the channel
+again when the workflow is deactivated.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
