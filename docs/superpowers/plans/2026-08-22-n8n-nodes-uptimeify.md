@@ -4830,3 +4830,490 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 13: Node `Uptimeify Tools`
+
+**Files:**
+- Create: `nodes/UptimeifyTools/shared/mcp.ts`, `nodes/UptimeifyTools/UptimeifyTools.node.ts`, `nodes/UptimeifyTools/UptimeifyTools.node.json`
+- Test: `test/mcp.test.ts`
+
+**Interfaces:**
+- Consumes: nichts aus den anderen Nodes — dieser Node ist eigenständig und braucht keine Credentials
+- Produces:
+  - `MCP_ENDPOINT = 'https://uptimeify.io/mcp'`
+  - `parseMcpBody(raw: unknown): IDataObject` — nimmt entweder ein JSON-Objekt oder einen Streamable-HTTP-Rumpf im `text/event-stream`-Format und liefert die JSON-RPC-Antwort
+  - `readToolResult(rpc: IDataObject): { structured: IDataObject; isError: boolean; text: string }`
+  - `TOOL_DEFINITIONS: Array<{ value: string; name: string; description: string; args: Array<{ name: string; displayName: string; type: 'string' | 'number'; required: boolean; placeholder: string }> }>`
+
+Der Endpunkt antwortet nur auf dem kanonischen Host. Auf einer Kunden-Custom-Domain wirft der
+Handler `404`, bevor er irgendetwas anderes tut. Deshalb gibt es hier keine Base-URL-Option.
+
+- [ ] **Step 1: Failing test schreiben**
+
+`test/mcp.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { parseMcpBody, readToolResult } from '../nodes/UptimeifyTools/shared/mcp';
+
+describe('parseMcpBody', () => {
+	it('passes a plain JSON-RPC object through', () => {
+		const rpc = { jsonrpc: '2.0', id: 1, result: { content: [] } };
+
+		expect(parseMcpBody(rpc)).toEqual(rpc);
+	});
+
+	it('parses a JSON string', () => {
+		expect(parseMcpBody('{"jsonrpc":"2.0","id":1,"result":{}}')).toEqual({
+			jsonrpc: '2.0',
+			id: 1,
+			result: {},
+		});
+	});
+
+	it('reads the last data frame of an event stream', () => {
+		const stream = [
+			'event: message',
+			'data: {"jsonrpc":"2.0","id":1,"result":{"isError":false}}',
+			'',
+		].join('\n');
+
+		expect(parseMcpBody(stream)).toEqual({
+			jsonrpc: '2.0',
+			id: 1,
+			result: { isError: false },
+		});
+	});
+
+	it('throws on a body it cannot read', () => {
+		expect(() => parseMcpBody('not json at all')).toThrow('Unreadable MCP response');
+	});
+});
+
+describe('readToolResult', () => {
+	it('prefers structured content', () => {
+		const rpc = {
+			result: {
+				isError: false,
+				content: [{ type: 'text', text: '{"ok":true}' }],
+				structuredContent: { ok: true },
+			},
+		};
+
+		expect(readToolResult(rpc)).toEqual({
+			structured: { ok: true },
+			isError: false,
+			text: '{"ok":true}',
+		});
+	});
+
+	it('falls back to the text block when there is no structured content', () => {
+		const rpc = { result: { isError: true, content: [{ type: 'text', text: 'rate limited' }] } };
+
+		expect(readToolResult(rpc)).toEqual({ structured: {}, isError: true, text: 'rate limited' });
+	});
+
+	it('surfaces a JSON-RPC level error as an error result', () => {
+		const rpc = { error: { code: -32602, message: 'Invalid params' } };
+
+		expect(readToolResult(rpc)).toEqual({ structured: {}, isError: true, text: 'Invalid params' });
+	});
+});
+```
+
+- [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
+
+Run: `npx vitest run test/mcp.test.ts`
+Expected: FAIL, `Failed to resolve import "../nodes/UptimeifyTools/shared/mcp"`.
+
+- [ ] **Step 3: `mcp.ts` schreiben**
+
+`nodes/UptimeifyTools/shared/mcp.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+
+/** `/mcp` answers only on the canonical host; a custom domain returns 404 before anything else. */
+export const MCP_ENDPOINT = 'https://uptimeify.io/mcp';
+
+type ToolArgument = {
+	name: string;
+	displayName: string;
+	type: 'string' | 'number';
+	required: boolean;
+	placeholder: string;
+};
+
+export type ToolDefinition = {
+	value: string;
+	name: string;
+	description: string;
+	args: ToolArgument[];
+};
+
+const host = (required = true): ToolArgument => ({
+	name: 'host',
+	displayName: 'Host',
+	type: 'string',
+	required,
+	placeholder: 'e.g. example.com',
+});
+
+const domain: ToolArgument = {
+	name: 'domain',
+	displayName: 'Domain',
+	type: 'string',
+	required: true,
+	placeholder: 'e.g. example.com',
+};
+
+const url: ToolArgument = {
+	name: 'url',
+	displayName: 'URL',
+	type: 'string',
+	required: true,
+	placeholder: 'e.g. https://example.com',
+};
+
+const ip: ToolArgument = {
+	name: 'ip',
+	displayName: 'IP Address',
+	type: 'string',
+	required: true,
+	placeholder: 'e.g. 203.0.113.10',
+};
+
+const query: ToolArgument = {
+	name: 'query',
+	displayName: 'Query',
+	type: 'string',
+	required: true,
+	placeholder: 'e.g. 203.0.113.10',
+};
+
+const port = (required: boolean): ToolArgument => ({
+	name: 'port',
+	displayName: 'Port',
+	type: 'number',
+	required,
+	placeholder: 'e.g. 443',
+});
+
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
+	{ value: 'asn_lookup', name: 'ASN Lookup', description: 'Look up an autonomous system', args: [query] },
+	{ value: 'check_dns', name: 'Check DNS', description: 'Resolve a domain', args: [domain] },
+	{
+		value: 'check_ssl',
+		name: 'Check SSL',
+		description: 'Inspect a TLS certificate',
+		args: [host(), port(false)],
+	},
+	{
+		value: 'dkim_check',
+		name: 'DKIM Check',
+		description: 'Check a DKIM record',
+		args: [
+			domain,
+			{
+				name: 'selector',
+				displayName: 'Selector',
+				type: 'string',
+				required: true,
+				placeholder: 'e.g. default',
+			},
+		],
+	},
+	{ value: 'dmarc_check', name: 'DMARC Check', description: 'Check a DMARC record', args: [domain] },
+	{ value: 'dns_propagation', name: 'DNS Propagation', description: 'Check DNS propagation', args: [domain] },
+	{ value: 'dnsbl_check', name: 'DNSBL Check', description: 'Check an IP against blocklists', args: [ip] },
+	{ value: 'domain_expiry', name: 'Domain Expiry', description: 'Check when a domain expires', args: [domain] },
+	{ value: 'hsts_check', name: 'HSTS Check', description: 'Check the HSTS policy', args: [domain] },
+	{ value: 'http_headers', name: 'HTTP Headers', description: 'Read the response headers', args: [url] },
+	{ value: 'ip_geolocation', name: 'IP Geolocation', description: 'Locate an IP address', args: [query] },
+	{ value: 'mx_lookup', name: 'MX Lookup', description: 'Look up mail exchangers', args: [domain] },
+	{
+		value: 'ping_test',
+		name: 'Ping Test',
+		description: 'Ping a host',
+		args: [host(), port(false)],
+	},
+	{
+		value: 'port_check',
+		name: 'Port Check',
+		description: 'Check whether a port answers',
+		args: [host(), port(true)],
+	},
+	{ value: 'redirect_check', name: 'Redirect Check', description: 'Follow a redirect chain', args: [url] },
+	{ value: 'response_time', name: 'Response Time', description: 'Measure the response time', args: [url] },
+	{ value: 'reverse_dns', name: 'Reverse DNS', description: 'Resolve an IP to a hostname', args: [ip] },
+	{ value: 'spf_check', name: 'SPF Check', description: 'Check an SPF record', args: [domain] },
+	{ value: 'website_status', name: 'Website Status', description: 'Check whether a site is up', args: [url] },
+	{ value: 'whois', name: 'WHOIS', description: 'Look up WHOIS data', args: [domain] },
+];
+
+/**
+ * The endpoint speaks streamable HTTP, so a successful call answers either with a JSON object or
+ * with an event stream whose last `data:` frame carries the JSON-RPC response.
+ */
+export function parseMcpBody(raw: unknown): IDataObject {
+	if (typeof raw === 'object' && raw !== null) return raw as IDataObject;
+
+	if (typeof raw === 'string') {
+		const trimmed = raw.trim();
+
+		if (trimmed.startsWith('{')) {
+			return JSON.parse(trimmed) as IDataObject;
+		}
+
+		const frames = trimmed
+			.split('\n')
+			.map((line) => line.trim())
+			.filter((line) => line.startsWith('data:'))
+			.map((line) => line.slice('data:'.length).trim());
+
+		const last = frames[frames.length - 1];
+		if (last !== undefined) return JSON.parse(last) as IDataObject;
+	}
+
+	throw new Error('Unreadable MCP response');
+}
+
+export function readToolResult(rpc: IDataObject): {
+	structured: IDataObject;
+	isError: boolean;
+	text: string;
+} {
+	const rpcError = rpc.error as { message?: string } | undefined;
+
+	if (rpcError !== undefined) {
+		return { structured: {}, isError: true, text: rpcError.message ?? 'MCP request failed' };
+	}
+
+	const result = (rpc.result ?? {}) as {
+		isError?: boolean;
+		content?: Array<{ type?: string; text?: string }>;
+		structuredContent?: IDataObject;
+	};
+
+	const text = result.content?.find((block) => block.type === 'text')?.text ?? '';
+
+	return {
+		structured: result.structuredContent ?? {},
+		isError: result.isError === true,
+		text,
+	};
+}
+```
+
+- [ ] **Step 4: Test laufen lassen, Erfolg bestätigen**
+
+Run: `npx vitest run test/mcp.test.ts`
+Expected: 7 Tests PASS.
+
+- [ ] **Step 5: Tools-Node schreiben**
+
+`nodes/UptimeifyTools/UptimeifyTools.node.ts`:
+
+```ts
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeProperties,
+	INodeType,
+	INodeTypeDescription,
+} from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { MCP_ENDPOINT, parseMcpBody, readToolResult, TOOL_DEFINITIONS } from './shared/mcp';
+
+function buildArgumentProperties(): INodeProperties[] {
+	const properties: INodeProperties[] = [];
+
+	for (const tool of TOOL_DEFINITIONS) {
+		for (const argument of tool.args) {
+			properties.push({
+				displayName: argument.displayName,
+				name: `${tool.value}_${argument.name}`,
+				type: argument.type,
+				default: argument.type === 'number' ? 0 : '',
+				required: argument.required,
+				placeholder: argument.placeholder,
+				displayOptions: { show: { operation: [tool.value] } },
+			});
+		}
+	}
+
+	return properties;
+}
+
+export class UptimeifyTools implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Uptimeify Tools',
+		name: 'uptimeifyTools',
+		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
+		group: ['transform'],
+		version: 1,
+		subtitle: '={{$parameter["operation"]}}',
+		description: 'Run Uptimeify public network checks. No account and no credentials needed.',
+		defaults: { name: 'Uptimeify Tools' },
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		properties: [
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				options: TOOL_DEFINITIONS.map((tool) => ({
+					name: tool.name,
+					value: tool.value,
+					description: tool.description,
+					action: tool.description,
+				})),
+				default: 'website_status',
+			},
+			...buildArgumentProperties(),
+		],
+	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const operation = this.getNodeParameter('operation', i) as string;
+				const tool = TOOL_DEFINITIONS.find((entry) => entry.value === operation);
+
+				if (tool === undefined) {
+					throw new NodeOperationError(this.getNode(), `Unknown tool "${operation}"`, {
+						itemIndex: i,
+					});
+				}
+
+				const args: IDataObject = {};
+
+				for (const argument of tool.args) {
+					const value = this.getNodeParameter(`${tool.value}_${argument.name}`, i) as
+						| string
+						| number;
+
+					if (value === '' || value === 0) {
+						if (argument.required) {
+							throw new NodeOperationError(
+								this.getNode(),
+								`"${argument.displayName}" is required for ${tool.name}`,
+								{ itemIndex: i },
+							);
+						}
+
+						continue;
+					}
+
+					args[argument.name] = value;
+				}
+
+				const response = await this.helpers.httpRequest({
+					method: 'POST',
+					url: MCP_ENDPOINT,
+					headers: {
+						'Content-Type': 'application/json',
+						Accept: 'application/json, text/event-stream',
+					},
+					body: {
+						jsonrpc: '2.0',
+						id: i + 1,
+						method: 'tools/call',
+						params: { name: tool.value, arguments: args },
+					},
+					json: true,
+					returnFullResponse: true,
+				});
+
+				const parsed = parseMcpBody((response as { body: unknown }).body);
+				const result = readToolResult(parsed);
+
+				if (result.isError) {
+					throw new NodeOperationError(this.getNode(), result.text, { itemIndex: i });
+				}
+
+				returnData.push({
+					json: Object.keys(result.structured).length > 0 ? result.structured : { text: result.text },
+					pairedItem: { item: i },
+				});
+			} catch (error) {
+				const statusCode = (error as { httpCode?: string; statusCode?: number }).statusCode;
+
+				if (statusCode === 429) {
+					const retryAfter = (error as { response?: { body?: { retryAfter?: number } } }).response
+						?.body?.retryAfter;
+
+					const hint =
+						retryAfter === undefined
+							? 'The rate limit was reached. The limits are 120 requests per minute overall and 15 to 30 per minute per tool, counted per IP.'
+							: `The rate limit was reached. Retry in ${retryAfter} seconds.`;
+
+					if (!this.continueOnFail()) {
+						throw new NodeApiError(this.getNode(), error as never, { description: hint });
+					}
+
+					returnData.push({ json: { error: hint }, pairedItem: { item: i } });
+					continue;
+				}
+
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: { error: (error as Error).message },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
+				throw error;
+			}
+		}
+
+		return [returnData];
+	}
+}
+```
+
+- [ ] **Step 6: Node-Metadaten schreiben**
+
+`nodes/UptimeifyTools/UptimeifyTools.node.json`:
+
+```json
+{
+	"node": "n8n-nodes-base.uptimeifyTools",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Developer Tools", "Utility"],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://uptimeify.io/docs/api/mcp"
+			}
+		]
+	}
+}
+```
+
+- [ ] **Step 7: Bauen, linten, Tests**
+
+Run: `npm run build && npm run lint && npm test`
+Expected: Build erfolgreich, Lint sauber, alle Tests PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add nodes/UptimeifyTools test/mcp.test.ts
+git commit -m "feat: add the Uptimeify tools node for the 20 public checks
+
+Calls the documented MCP endpoint over JSON-RPC and returns structuredContent.
+The endpoint speaks streamable HTTP, so an event-stream body is read as well. A
+429 answer carries retryAfter into the message so a workflow can wait it out.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
