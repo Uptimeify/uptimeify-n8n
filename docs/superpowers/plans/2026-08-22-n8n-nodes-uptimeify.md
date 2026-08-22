@@ -325,3 +325,386 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 3: Fehlerübersetzung
+
+**Files:**
+- Create: `nodes/Uptimeify/shared/errors.ts`
+- Test: `test/errors.test.ts`
+
+**Interfaces:**
+- Consumes: nichts
+- Produces:
+  - `UPTIMEIFY_ERROR_MESSAGES: Record<string, string>`
+  - `describeUptimeifyError(error: unknown): string | undefined`
+
+- [ ] **Step 1: Failing test schreiben**
+
+`test/errors.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { describeUptimeifyError } from '../nodes/Uptimeify/shared/errors';
+
+describe('describeUptimeifyError', () => {
+	it('reads a known code from an httpRequest error body', () => {
+		const error = { response: { body: { data: { code: 'imAccessDenied' } } } };
+
+		expect(describeUptimeifyError(error)).toBe(
+			'Incident Management requires an organization-wide API token. A customer-scoped token is rejected.',
+		);
+	});
+
+	it('reads a known code from a nested error property', () => {
+		const error = { error: { data: { code: 'notManualIncident' } } };
+
+		expect(describeUptimeifyError(error)).toBe(
+			'Only manually created incidents can be deleted. Monitor-generated incidents are owned by the workers.',
+		);
+	});
+
+	it('returns undefined for an unknown code', () => {
+		const error = { response: { body: { data: { code: 'somethingNew' } } } };
+
+		expect(describeUptimeifyError(error)).toBeUndefined();
+	});
+
+	it('returns undefined when there is no code at all', () => {
+		expect(describeUptimeifyError({ message: 'socket hang up' })).toBeUndefined();
+		expect(describeUptimeifyError(undefined)).toBeUndefined();
+		expect(describeUptimeifyError('nope')).toBeUndefined();
+	});
+});
+```
+
+- [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
+
+Run: `npx vitest run test/errors.test.ts`
+Expected: FAIL, `Failed to resolve import "../nodes/Uptimeify/shared/errors"`.
+
+- [ ] **Step 3: Implementierung schreiben**
+
+`nodes/Uptimeify/shared/errors.ts`:
+
+```ts
+export const UPTIMEIFY_ERROR_MESSAGES: Record<string, string> = {
+	managed_by_organization:
+		'This monitor is managed by the organization. Open a change request instead of editing it directly.',
+	selfServiceNotAllowed: 'Self-service monitors are disabled for this customer.',
+	selfServiceQuotaReached:
+		'The customer has reached its self-service monitor quota. The quota counts all monitor types together.',
+	managementTypeOrgOnly:
+		'Only an organization admin can move a monitor between managed and self-service.',
+	tooManyOpenRequests: 'The customer already has 10 open change requests.',
+	invalidPackageType: 'The package does not belong to this organization.',
+	portRequiredForTcp: 'An IMAP/POP monitor in TCP check mode needs an explicit port.',
+	invalidCheckMode: 'Check mode has to be either "protocol" or "tcp".',
+	notManualIncident:
+		'Only manually created incidents can be deleted. Monitor-generated incidents are owned by the workers.',
+	imAccessDenied:
+		'Incident Management requires an organization-wide API token. A customer-scoped token is rejected.',
+	imNotEnabled: 'Incident Management is not enabled for this organization.',
+	imTeamWriteDenied: 'You need admin rights on this team to write to it.',
+	imScheduleNotFound: 'This schedule does not exist in your organization.',
+	invalidWindow: 'The end time has to be after the start time.',
+	payloadTooLarge: 'The event payload is larger than 256 KB.',
+	payloadTooDeep: 'The event payload is nested deeper than 20 levels.',
+	organizationIdRequired: 'The organization could not be resolved from the API token.',
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function readCode(value: unknown): string | undefined {
+	if (!isRecord(value)) return undefined;
+
+	const data = value.data;
+	if (isRecord(data) && typeof data.code === 'string') return data.code;
+
+	return undefined;
+}
+
+/**
+ * Uptimeify puts a machine-readable reason in `data.code`. Depending on where the failure is
+ * caught, that object sits under `response.body`, under `error`, or at the top level, so all
+ * three are checked.
+ */
+export function describeUptimeifyError(error: unknown): string | undefined {
+	if (!isRecord(error)) return undefined;
+
+	const response = error.response;
+	const candidates: unknown[] = [
+		isRecord(response) ? response.body : undefined,
+		error.error,
+		error.body,
+		error,
+	];
+
+	for (const candidate of candidates) {
+		const code = readCode(candidate);
+		if (code !== undefined && code in UPTIMEIFY_ERROR_MESSAGES) {
+			return UPTIMEIFY_ERROR_MESSAGES[code];
+		}
+	}
+
+	return undefined;
+}
+```
+
+- [ ] **Step 4: Test laufen lassen, Erfolg bestätigen**
+
+Run: `npx vitest run test/errors.test.ts`
+Expected: 4 Tests PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add nodes/Uptimeify/shared/errors.ts test/errors.test.ts
+git commit -m "feat: translate Uptimeify data.code values into readable messages
+
+Covers monitor ownership, package, check mode, incident, and Incident
+Management codes. Unknown codes fall through untouched.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
+
+### Task 4: HTTP-Transport und Pagination
+
+**Files:**
+- Create: `nodes/Uptimeify/shared/transport.ts`
+- Test: `test/transport.test.ts`
+
+**Interfaces:**
+- Consumes: `describeUptimeifyError` (Task 3), Credential `uptimeifyApi` (Task 2)
+- Produces:
+  - `type UptimeifyContext = IExecuteFunctions | ILoadOptionsFunctions | IHookFunctions | IWebhookFunctions`
+  - `uptimeifyApiRequest(this: UptimeifyContext, method: IHttpRequestMethods, path: string, body?: IDataObject, qs?: IDataObject): Promise<unknown>`
+  - `uptimeifyApiRequestAllItems(this: UptimeifyContext, path: string, qs: IDataObject, options: { mode: 'page' | 'cursor' | 'array'; limit?: number }): Promise<IDataObject[]>`
+  - `cleanQuery(qs: IDataObject): IDataObject`
+  - `extractItems(response: unknown): IDataObject[]`
+  - `MAX_PER_PAGE = 200`, `MAX_CURSOR_LIMIT = 100`
+
+- [ ] **Step 1: Failing test schreiben**
+
+`test/transport.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { cleanQuery, extractItems } from '../nodes/Uptimeify/shared/transport';
+
+describe('cleanQuery', () => {
+	it('drops undefined, null and empty strings but keeps false and zero', () => {
+		expect(cleanQuery({ a: 1, b: undefined, c: null, d: '', e: 'x', f: false, g: 0 })).toEqual({
+			a: 1,
+			e: 'x',
+			f: false,
+			g: 0,
+		});
+	});
+
+	it('keeps arrays so repeatable parameters survive', () => {
+		expect(cleanQuery({ status: ['triggered', 'acknowledged'] })).toEqual({
+			status: ['triggered', 'acknowledged'],
+		});
+	});
+});
+
+describe('extractItems', () => {
+	it('unwraps a paged response', () => {
+		expect(extractItems({ items: [{ id: 1 }], total: 1, page: 1, perPage: 50 })).toEqual([
+			{ id: 1 },
+		]);
+	});
+
+	it('passes a bare array through', () => {
+		expect(extractItems([{ id: 1 }, { id: 2 }])).toEqual([{ id: 1 }, { id: 2 }]);
+	});
+
+	it('returns an empty array for anything else', () => {
+		expect(extractItems(null)).toEqual([]);
+		expect(extractItems({ statusPage: { id: 1 } })).toEqual([]);
+	});
+});
+```
+
+- [ ] **Step 2: Test laufen lassen, Fehlschlag bestätigen**
+
+Run: `npx vitest run test/transport.test.ts`
+Expected: FAIL, `Failed to resolve import "../nodes/Uptimeify/shared/transport"`.
+
+- [ ] **Step 3: Implementierung schreiben**
+
+`nodes/Uptimeify/shared/transport.ts`:
+
+```ts
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	IHookFunctions,
+	IHttpRequestMethods,
+	IHttpRequestOptions,
+	ILoadOptionsFunctions,
+	IWebhookFunctions,
+} from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
+import { describeUptimeifyError } from './errors';
+
+export type UptimeifyContext =
+	| IExecuteFunctions
+	| ILoadOptionsFunctions
+	| IHookFunctions
+	| IWebhookFunctions;
+
+/** Page size ceiling of the paged endpoints. */
+export const MAX_PER_PAGE = 200;
+
+/** Page size ceiling of the cursor-paginated Incident Management endpoints. */
+export const MAX_CURSOR_LIMIT = 100;
+
+/**
+ * Optional query parameters have to be absent, not empty. Uptimeify coerces `organizationId=`
+ * to the number 0, which then fails its own minimum constraint with a 400.
+ */
+export function cleanQuery(qs: IDataObject): IDataObject {
+	const cleaned: IDataObject = {};
+
+	for (const [key, value] of Object.entries(qs)) {
+		if (value === undefined || value === null || value === '') continue;
+		cleaned[key] = value;
+	}
+
+	return cleaned;
+}
+
+export function extractItems(response: unknown): IDataObject[] {
+	if (Array.isArray(response)) return response as IDataObject[];
+
+	if (typeof response === 'object' && response !== null) {
+		const items = (response as { items?: unknown }).items;
+		if (Array.isArray(items)) return items as IDataObject[];
+	}
+
+	return [];
+}
+
+export async function uptimeifyApiRequest(
+	this: UptimeifyContext,
+	method: IHttpRequestMethods,
+	path: string,
+	body?: IDataObject,
+	qs: IDataObject = {},
+): Promise<unknown> {
+	const credentials = await this.getCredentials('uptimeifyApi');
+	const baseUrl = String(credentials.baseUrl ?? 'https://uptimeify.io').replace(/\/+$/, '');
+
+	const options: IHttpRequestOptions = {
+		method,
+		url: `${baseUrl}${path}`,
+		qs: cleanQuery(qs),
+		headers: { Accept: 'application/json' },
+		json: true,
+	};
+
+	if (body !== undefined) options.body = body;
+
+	try {
+		return await this.helpers.httpRequestWithAuthentication.call(this, 'uptimeifyApi', options);
+	} catch (error) {
+		const description = describeUptimeifyError(error);
+		throw new NodeApiError(
+			this.getNode(),
+			error as never,
+			description === undefined ? undefined : { description },
+		);
+	}
+}
+
+/**
+ * Walks a list endpoint to its end, or to `limit` items, whichever comes first. `mode` picks the
+ * pagination dialect: `page` uses page/perPage, `cursor` uses limit/cursor, `array` means the
+ * endpoint answers with everything at once.
+ */
+export async function uptimeifyApiRequestAllItems(
+	this: UptimeifyContext,
+	path: string,
+	qs: IDataObject,
+	options: { mode: 'page' | 'cursor' | 'array'; limit?: number },
+): Promise<IDataObject[]> {
+	const { mode, limit } = options;
+	const collected: IDataObject[] = [];
+
+	if (mode === 'array') {
+		const response = await uptimeifyApiRequest.call(this, 'GET', path, undefined, qs);
+		const items = extractItems(response);
+		return limit === undefined ? items : items.slice(0, limit);
+	}
+
+	if (mode === 'cursor') {
+		let cursor: string | undefined;
+
+		do {
+			const pageSize =
+				limit === undefined
+					? MAX_CURSOR_LIMIT
+					: Math.min(MAX_CURSOR_LIMIT, limit - collected.length);
+			const response = await uptimeifyApiRequest.call(this, 'GET', path, undefined, {
+				...qs,
+				limit: pageSize,
+				cursor,
+			});
+			const items = extractItems(response);
+			collected.push(...items);
+
+			cursor = (response as { nextCursor?: string | null }).nextCursor ?? undefined;
+			if (items.length === 0) break;
+		} while (cursor !== undefined && (limit === undefined || collected.length < limit));
+
+		return limit === undefined ? collected : collected.slice(0, limit);
+	}
+
+	let page = 1;
+
+	for (;;) {
+		const response = await uptimeifyApiRequest.call(this, 'GET', path, undefined, {
+			...qs,
+			page,
+			perPage: MAX_PER_PAGE,
+		});
+		const items = extractItems(response);
+		collected.push(...items);
+
+		if (items.length < MAX_PER_PAGE) break;
+		if (limit !== undefined && collected.length >= limit) break;
+		page += 1;
+	}
+
+	return limit === undefined ? collected : collected.slice(0, limit);
+}
+```
+
+- [ ] **Step 4: Test laufen lassen, Erfolg bestätigen**
+
+Run: `npx vitest run test/transport.test.ts`
+Expected: 5 Tests PASS.
+
+- [ ] **Step 5: Typprüfung**
+
+Run: `npx tsc --noEmit`
+Expected: keine Ausgabe, Exit-Code 0.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add nodes/Uptimeify/shared/transport.ts test/transport.test.ts
+git commit -m "feat: add Uptimeify HTTP transport with three pagination modes
+
+Page, cursor and bare-array endpoints all answer differently, so the caller
+picks the dialect. Empty query parameters are stripped because the API coerces
+them to zero and then rejects the request.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
