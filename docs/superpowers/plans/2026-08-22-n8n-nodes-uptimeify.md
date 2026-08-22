@@ -5317,3 +5317,306 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 14: README, CHANGELOG, LICENSE
+
+**Files:**
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+- Create: `LICENSE`
+
+**Interfaces:**
+- Consumes: die fertigen Nodes aus Task 6 bis 13
+- Produces: die Dokumentation, auf die `Uptimeify.node.json` und
+  `UptimeifyTrigger.node.json` mit `credentialDocumentation` verweisen (Anker `#credentials`)
+
+- [ ] **Step 1: README schreiben**
+
+`README.md` mit dieser Gliederung. Der Anker `#credentials` muss existieren, sonst zeigt der
+Link in den `.node.json`-Dateien ins Leere.
+
+```markdown
+# n8n-nodes-uptimeify
+
+n8n community nodes for [Uptimeify](https://uptimeify.io), an EU-hosted white-label monitoring
+platform for agencies and MSPs.
+
+This package adds three nodes:
+
+- **Uptimeify** — manage websites, service monitors, customers, incidents, status pages,
+  maintenance windows, notification channels, tags, and Incident Management.
+- **Uptimeify Trigger** — start a workflow when Uptimeify raises or resolves an alert.
+- **Uptimeify Tools** — run the 20 public network checks. No account needed.
+
+## Installation
+
+Follow the [community nodes installation guide](https://docs.n8n.io/integrations/community-nodes/installation/)
+and install `@haupt-pascal/n8n-nodes-uptimeify`.
+
+## Credentials
+
+The Uptimeify and Uptimeify Trigger nodes need an API token. Create one in Uptimeify under
+**Settings > API tokens**:
+
+- Leave the customer field **empty** for an organization-wide token. It sees every customer and
+  is the only kind Incident Management accepts.
+- Pick a customer to scope the token to that customer.
+
+The token is shown once, on creation. Set **Base URL** only if you reach Uptimeify under your own
+white-label domain; it defaults to `https://uptimeify.io`.
+
+The Uptimeify Tools node needs no credentials.
+
+## Operations
+
+(Table: resource, operations, notes. One row per resource, taken from the node.)
+
+## Uptimeify Trigger
+
+On activation the node creates a webhook notification channel in Uptimeify pointing at its own
+webhook URL, with a generated signing secret. On deactivation it deletes that channel again.
+
+Every request is verified against the `X-Webhook-Signature` header (HMAC-SHA256 over the raw
+body). A request that does not verify is answered with 401 and does not start the workflow. Turn
+**Verify Signature** off only if a proxy in front of n8n rewrites the request body.
+
+Scope the channel to the whole organization, to one customer, or to a single website. A
+website-level override additionally needs the parent channel's ID.
+
+## Uptimeify Tools
+
+Rate limits are counted per IP: 120 requests per minute across the endpoint, and 15 to 30 per
+minute per tool (`whois` and `domain_expiry` are the strictest). A 429 answer carries the number
+of seconds until the window resets into the error message.
+
+## Notes
+
+- `Status Page: Create` answers with `{ statusPage, dns }`, so the new page is at
+  `$json.statusPage`.
+- Incident Management operations need an organization-wide token **and** Incident Management
+  enabled for the organization. Otherwise the API answers 403 and the node explains which of the
+  two is missing.
+- `Website: Get Check History` and the monitor history operations cap out at 200 entries. There
+  is no pagination on those endpoints.
+
+## Example workflows
+
+(Two short examples: alert to Slack via the trigger, and a nightly certificate check with the
+tools node.)
+
+## License
+
+[MIT](LICENSE)
+```
+
+- [ ] **Step 2: CHANGELOG schreiben**
+
+`CHANGELOG.md`:
+
+```markdown
+# Changelog
+
+## 0.1.0
+
+First release.
+
+- **Uptimeify** node with the resources Customer, Customer Domain, Customer IP, Incident,
+  Incident Management: Incident, Incident Management: On-Call, Maintenance Window, Monitor,
+  Notification Channel, Status Page, Tag, and Website.
+- **Uptimeify Trigger** node. Registers and removes its own webhook notification channel and
+  verifies the HMAC-SHA256 signature of every request.
+- **Uptimeify Tools** node with the 20 public check tools of the Uptimeify MCP endpoint. Needs no
+  credentials.
+```
+
+- [ ] **Step 3: LICENSE schreiben**
+
+`LICENSE` mit dem MIT-Text, Copyright `2026 Pascal Haupt`.
+
+- [ ] **Step 4: Anker prüfen**
+
+Run: `grep -n '^## Credentials' README.md`
+Expected: eine Trefferzeile. Ohne sie zeigt `credentialDocumentation` ins Leere.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add README.md CHANGELOG.md LICENSE
+git commit -m "docs: document the three nodes, credentials and rate limits
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
+
+### Task 15: Cloud-Eignung, Gesamtprüfung, manueller Durchlauf
+
+Diese Aufgabe ist das Qualitätstor vor der Veröffentlichung. Sie erzeugt keinen neuen Code,
+sondern belegt, dass das Paket den Regeln entspricht und in n8n tatsächlich funktioniert.
+
+**Files:**
+- Modify: möglicherweise `eslint.config.mjs` (nur zurücksetzen, nie erweitern)
+
+**Interfaces:**
+- Consumes: das vollständige Paket aus Task 1 bis 14
+- Produces: ein Paket, das `n8n-node lint` im Strict-Modus besteht und manuell verifiziert ist
+
+- [ ] **Step 1: Cloud-Unterstützung aktivieren**
+
+Run: `npx n8n-node cloud-support enable`
+Expected: Meldung, dass Strict-Modus und Standard-ESLint-Konfiguration aktiv sind.
+
+Run: `npx n8n-node cloud-support`
+Expected: Status meldet Cloud-Eignung als aktiv.
+
+- [ ] **Step 2: Gesamtprüfung**
+
+Run: `npm run lint && npm run build && npm test`
+Expected: Lint ohne Fehler **und ohne Warnungen**, Build erfolgreich, alle Tests PASS.
+
+Warnungen werden behoben, nicht unterdrückt. Eine Ausnahme braucht einen Kommentar in derselben
+Zeile, der begründet, warum die Regel hier nicht greift.
+
+- [ ] **Step 3: Keine Runtime-Dependencies belegen**
+
+Run: `node -e "const p=require('./package.json'); console.log(JSON.stringify(p.dependencies ?? null))"`
+Expected: `null`.
+
+- [ ] **Step 4: Sicherheitsdurchsicht**
+
+Prüfen und je Punkt bestätigen:
+
+- Jedes Feld, das ein Geheimnis trägt, hat `typeOptions: { password: true }`: Credential
+  `apiToken`, SMTP `pass`, SSH `password` und `privateKey`, FTP `password`, IMAP/POP `password`,
+  Website `authorizationHeader` und `basicAuthPassword`.
+- Kein `console.log` im ausgelieferten Code: `grep -rn "console\." nodes credentials` liefert
+  nichts.
+- Keine hartkodierten Zugangsdaten: `grep -rn "wsm_" nodes credentials` liefert nur
+  Platzhaltertexte in `placeholder`-Feldern.
+- Das Trigger-Secret steht ausschließlich in `staticData` und im Uptimeify-Channel, nie in einer
+  Ausgabe des Nodes.
+
+- [ ] **Step 5: Manueller Durchlauf in n8n**
+
+Run: `npm run dev`
+
+n8n startet auf `http://localhost:5678`. Dort mit einem echten Token durchspielen und je Punkt
+abhaken:
+
+1. Credential anlegen, **Test** drücken — grün.
+2. `Uptimeify` → Website → Get Many, *Return All* aus, Limit 5 — fünf Einträge.
+3. `Uptimeify` → Monitor → Monitor Type ICMP → Get Many — Liste erscheint, der Resource Locator
+   füllt sich.
+4. `Uptimeify` → Website → Create → Trigger Check → Delete — der Kreis schließt sich.
+5. `Uptimeify Trigger` aktivieren. In Uptimeify unter den Notification Channels erscheint ein
+   Kanal namens `n8n — <Workflow>`. Einen echten Alarm auslösen (Monitor auf eine nicht
+   erreichbare Adresse zeigen lassen), der Workflow läuft, die Signatur verifiziert.
+6. Workflow deaktivieren — der Kanal ist in Uptimeify wieder weg.
+7. `Uptimeify Tools` → Check SSL für `uptimeify.io` — Zertifikatsdaten kommen zurück.
+8. `Uptimeify Tools` → WHOIS mehrfach hintereinander bis zum 429 — die Fehlermeldung nennt die
+   Wartezeit.
+
+**Vorbedingung, vor Beginn zu klären:** Läuft dieser Durchlauf gegen eine Sandbox-Organisation
+oder gegen Produktion? Schritt 4 und 5 legen echte Monitore und Kanäle an und lösen echte Alarme
+aus. Ohne diese Antwort nicht anfangen.
+
+- [ ] **Step 6: Commit**
+
+Nur committen, falls Schritt 1 oder 2 Dateien verändert hat.
+
+```bash
+git add -A
+git commit -m "chore: enable n8n cloud support and clear all lint warnings
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
+
+### Task 16: Veröffentlichung und Einreichung
+
+**Files:**
+- Modify: `.github/workflows/publish.yml` (nur falls die vorhandene Fassung keine Provenance erzeugt)
+
+**Interfaces:**
+- Consumes: das geprüfte Paket aus Task 15
+- Produces: `@haupt-pascal/n8n-nodes-uptimeify@0.1.0` auf npm, mit Provenance, und eine
+  Einreichung im n8n Creator Portal
+
+- [ ] **Step 1: Publish-Workflow prüfen**
+
+`.github/workflows/publish.yml` öffnen und sicherstellen:
+
+- Der Job hat `permissions: { id-token: write, contents: read }` — ohne `id-token` gibt es keine
+  Provenance.
+- `npm publish` läuft mit `--provenance --access public`.
+- Kein langlebiges npm-Token in den Secrets nötig; npm Trusted Publisher ist eingerichtet.
+
+Ab dem 01.05.2026 müssen verifizierte Nodes über GitHub Actions mit Provenance veröffentlicht
+werden. `@n8n/node-cli` muss mindestens 0.23.0 sein:
+
+Run: `node -e "console.log(require('./node_modules/@n8n/node-cli/package.json').version)"`
+Expected: eine Version größer oder gleich `0.23.0`.
+
+- [ ] **Step 2: npm Trusted Publisher einrichten**
+
+Auf npmjs.com für das Paket `@haupt-pascal/n8n-nodes-uptimeify` unter *Trusted publishers* das
+GitHub-Repository und den Workflow `publish.yml` hinterlegen. Das ist ein manueller Schritt im
+Browser und lässt sich nicht aus dem Repository heraus erledigen.
+
+- [ ] **Step 3: Repository auf GitHub anlegen und pushen**
+
+```bash
+gh repo create haupt-pascal/n8n-nodes-uptimeify --public --source=. --remote=origin --push
+```
+
+- [ ] **Step 4: Version taggen und veröffentlichen lassen**
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Anschließend den Workflow-Lauf beobachten:
+
+Run: `gh run watch`
+Expected: der Publish-Job wird grün.
+
+Run: `npm view @haupt-pascal/n8n-nodes-uptimeify version`
+Expected: `0.1.0`.
+
+- [ ] **Step 5: Installation aus npm gegenprüfen**
+
+In einer frischen n8n-Instanz das Paket über *Settings > Community nodes* installieren und einen
+Node öffnen. Erscheinen die drei Nodes mit Icon und lässt sich das Credential anlegen, ist das
+Paket auslieferbar.
+
+- [ ] **Step 6: Einreichen**
+
+Im [n8n Creator Portal](https://creators.n8n.io/nodes) das Paket einreichen. Bereitzuhalten:
+
+- npm-Paketname und Version
+- Repository-URL
+- kurze Beschreibung, was die Nodes tun
+- der Nachweis, dass keine Runtime-Dependencies enthalten sind (Task 15, Schritt 3)
+
+- [ ] **Step 7: Commit**
+
+Nur falls Schritt 1 den Workflow verändert hat.
+
+```bash
+git add .github/workflows/publish.yml
+git commit -m "ci: publish with npm provenance from GitHub Actions
+
+Verified community nodes have to be published this way from 2026-05-01.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
+
+## Was dieser Plan nicht abdeckt
+
+Bewusst außen vor, in der Spec begründet: Billing, Users, Whitelabel und Branding, Reports,
+API-Token-Verwaltung, Custom Fields, Change Requests, Organization SMTP, Data Exports, Package
+Configs, Monitoring Locations. Ebenfalls offen und im Uptimeify-Repository zu erledigen: der
+Header `X-Webhook-Event` fehlt in der Webhook-Dokumentation (EN und DE in derselben Änderung).
