@@ -4756,14 +4756,17 @@ export class UptimeifyTrigger implements INodeType {
 			}
 
 			if (!isValidSignature(rawBody, headers['x-webhook-signature'], secret)) {
-				return { noWebhookResponse: true, webhookResponse: { status: 401 } };
+				// Answer the request ourselves so nothing downstream sees an unverified payload.
+				this.getResponseObject().status(401).send('Invalid signature');
+				return { noWebhookResponse: true };
 			}
 		}
 
 		const type = (body as { type?: string }).type;
 
 		if (events.length > 0 && (type === undefined || !events.includes(type))) {
-			return { noWebhookResponse: false, workflowData: [[]] };
+			// No `workflowData` means the request is acknowledged without starting a run.
+			return {};
 		}
 
 		return {
@@ -5368,7 +5371,24 @@ The Uptimeify Tools node needs no credentials.
 
 ## Operations
 
-(Table: resource, operations, notes. One row per resource, taken from the node.)
+| Resource | Operations |
+| --- | --- |
+| Customer | Create, Get, Get Many, Update, Bulk Action, Get SMS Usage |
+| Customer Domain | Create, Get, Get Many, Update, Delete |
+| Customer IP | Create, Get, Get Many, Update, Delete |
+| Incident | Get, Get Many, Delete |
+| Incident Management: Incident | Ingest Event, Create, Get, Get Many, Update Status, Resolve |
+| Incident Management: On-Call | Who Is on Call, Get Teams, Get Schedules, Create Schedule Override |
+| Maintenance Window | Create, Get, Get Many, Update, Delete, Preview Occurrences |
+| Monitor | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History |
+| Notification Channel | Create, Get Many, Update, Delete, Test |
+| Status Page | Create, Get Many, Update, Delete |
+| Tag | Create, Get Many, Update, Delete, Assign to Monitor, Remove From Monitor |
+| Website | Create, Get, Get Many, Update, Delete, Trigger Check, Change Status, Get Check History, Get Uptime Stats |
+
+The Monitor resource covers DNS, ICMP, TCP, SMTP, SSH, FTP and IMAP/POP through a single
+**Monitor Type** field. Domain expiry monitoring lives under Customer Domain, DNSBL monitoring
+under Customer IP.
 
 ## Uptimeify Trigger
 
@@ -5400,8 +5420,20 @@ of seconds until the window resets into the error message.
 
 ## Example workflows
 
-(Two short examples: alert to Slack via the trigger, and a nightly certificate check with the
-tools node.)
+**Page the on-call engineer when a site goes down**
+
+`Uptimeify Trigger` (Events: Alert) → `IF` (`{{ $json.incident.error_details.blocking_response }}`
+is empty) → `Uptimeify` (Incident Management: Incident, Ingest Event, payload
+`{{ JSON.stringify($json) }}`).
+
+The `IF` step splits a real outage from a check that a firewall turned away. When
+`blocking_response` is set, an edge rejected the check and the origin may be healthy.
+
+**Check certificates every night**
+
+`Schedule Trigger` (daily) → `Uptimeify` (Website, Get Many, Return All) → `Uptimeify Tools`
+(Check SSL, Host `{{ $json.url.replace(/^https?:\/\//, '').split('/')[0] }}`) → `IF`
+(days remaining below 21) → your notification of choice.
 
 ## License
 
@@ -5430,7 +5462,15 @@ First release.
 
 - [ ] **Step 3: LICENSE schreiben**
 
-`LICENSE` mit dem MIT-Text, Copyright `2026 Pascal Haupt`.
+`LICENSE` mit dem unveränderten MIT-Text, Copyright-Zeile:
+
+```
+MIT License
+
+Copyright (c) 2026 Pascal Haupt
+```
+
+Danach der vollständige MIT-Wortlaut, wie ihn `https://opensource.org/license/mit` führt.
 
 - [ ] **Step 4: Anker prüfen**
 
