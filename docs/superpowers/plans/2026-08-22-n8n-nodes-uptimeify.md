@@ -47,9 +47,13 @@ Unterendpunkte je Monitor: `POST /:id/trigger-check`, `GET /:id/check-history`,
 
 1. Seiten — Antwort `{ items, total, page, perPage }`, Query `page` + `perPage` (max 200).
    Websites, Monitore, Maintenance Windows, Customer Domains, Customer IPs.
-2. Cursor — Antwort `{ items, nextCursor }`, Query `limit` (max 100) + `cursor`.
+2. Offset — nacktes Array, Query `limit` (max 500) + `offset`. Nur `/api/incidents`.
+   `includeTotal` wird bewusst nicht gesetzt: mit diesem Parameter antwortet der Endpunkt
+   `{ incidents, total, limit, offset }` statt einem Array, und der Abbruch über die
+   Seitenlänge funktioniert ohne ihn genauso.
+3. Cursor — Antwort `{ items, nextCursor }`, Query `limit` (max 100) + `cursor`.
    Nur `/api/im/incidents`.
-3. Nacktes Array, keine Query-Pagination. `/api/customers`, `/api/tags`,
+4. Nacktes Array ohne Query-Pagination. `/api/customers`, `/api/tags`,
    `/api/notification-channels`, `/api/im/teams`, `/api/im/schedules`, `/api/im/on-call`.
 
 **Fehler** tragen einen maschinenlesbaren Grund in `data.code`.
@@ -482,10 +486,10 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 - Produces:
   - `type UptimeifyContext = IExecuteFunctions | ILoadOptionsFunctions | IHookFunctions | IWebhookFunctions`
   - `uptimeifyApiRequest(this: UptimeifyContext, method: IHttpRequestMethods, path: string, body?: IDataObject, qs?: IDataObject): Promise<unknown>`
-  - `uptimeifyApiRequestAllItems(this: UptimeifyContext, path: string, qs: IDataObject, options: { mode: 'page' | 'cursor' | 'array'; limit?: number }): Promise<IDataObject[]>`
+  - `uptimeifyApiRequestAllItems(this: UptimeifyContext, path: string, qs: IDataObject, options: { mode: 'page' | 'offset' | 'cursor' | 'array'; limit?: number }): Promise<IDataObject[]>`
   - `cleanQuery(qs: IDataObject): IDataObject`
   - `extractItems(response: unknown): IDataObject[]`
-  - `MAX_PER_PAGE = 200`, `MAX_CURSOR_LIMIT = 100`
+  - `MAX_PER_PAGE = 200`, `MAX_CURSOR_LIMIT = 100`, `MAX_OFFSET_LIMIT = 500`
 
 - [ ] **Step 1: Failing test schreiben**
 
@@ -568,6 +572,9 @@ export const MAX_PER_PAGE = 200;
 /** Page size ceiling of the cursor-paginated Incident Management endpoints. */
 export const MAX_CURSOR_LIMIT = 100;
 
+/** Page size ceiling of the offset-paginated monitoring incidents endpoint. */
+export const MAX_OFFSET_LIMIT = 500;
+
 /**
  * Optional query parameters have to be absent, not empty. Uptimeify coerces `organizationId=`
  * to the number 0, which then fails its own minimum constraint with a 400.
@@ -635,14 +642,14 @@ export async function uptimeifyApiRequest(
 
 /**
  * Walks a list endpoint to its end, or to `limit` items, whichever comes first. `mode` picks the
- * pagination dialect: `page` uses page/perPage, `cursor` uses limit/cursor, `array` means the
- * endpoint answers with everything at once.
+ * pagination dialect: `page` uses page/perPage, `offset` uses limit/offset, `cursor` uses
+ * limit/cursor, `array` means the endpoint answers with everything at once.
  */
 export async function uptimeifyApiRequestAllItems(
 	this: UptimeifyContext,
 	path: string,
 	qs: IDataObject,
-	options: { mode: 'page' | 'cursor' | 'array'; limit?: number },
+	options: { mode: 'page' | 'offset' | 'cursor' | 'array'; limit?: number },
 ): Promise<IDataObject[]> {
 	const { mode, limit } = options;
 	const collected: IDataObject[] = [];
@@ -651,6 +658,26 @@ export async function uptimeifyApiRequestAllItems(
 		const response = await uptimeifyApiRequest.call(this, 'GET', path, undefined, qs);
 		const items = extractItems(response);
 		return limit === undefined ? items : items.slice(0, limit);
+	}
+
+	if (mode === 'offset') {
+		let offset = 0;
+
+		for (;;) {
+			const response = await uptimeifyApiRequest.call(this, 'GET', path, undefined, {
+				...qs,
+				limit: MAX_OFFSET_LIMIT,
+				offset,
+			});
+			const items = extractItems(response);
+			collected.push(...items);
+
+			if (items.length < MAX_OFFSET_LIMIT) break;
+			if (limit !== undefined && collected.length >= limit) break;
+			offset += MAX_OFFSET_LIMIT;
+		}
+
+		return limit === undefined ? collected : collected.slice(0, limit);
 	}
 
 	if (mode === 'cursor') {
