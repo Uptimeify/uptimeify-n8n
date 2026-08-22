@@ -522,6 +522,10 @@ describe('extractItems', () => {
 		expect(extractItems([{ id: 1 }, { id: 2 }])).toEqual([{ id: 1 }, { id: 2 }]);
 	});
 
+	it('unwraps a data array, the shape the history endpoints answer with', () => {
+		expect(extractItems({ data: [{ id: 'chk_1' }] })).toEqual([{ id: 'chk_1' }]);
+	});
+
 	it('returns an empty array for anything else', () => {
 		expect(extractItems(null)).toEqual([]);
 		expect(extractItems({ statusPage: { id: 1 } })).toEqual([]);
@@ -578,12 +582,19 @@ export function cleanQuery(qs: IDataObject): IDataObject {
 	return cleaned;
 }
 
+/**
+ * List endpoints answer in three shapes: a bare array, `{ items }` for the paged and cursor
+ * endpoints, and `{ data }` for the check/alert/incident history endpoints.
+ */
 export function extractItems(response: unknown): IDataObject[] {
 	if (Array.isArray(response)) return response as IDataObject[];
 
 	if (typeof response === 'object' && response !== null) {
 		const items = (response as { items?: unknown }).items;
 		if (Array.isArray(items)) return items as IDataObject[];
+
+		const data = (response as { data?: unknown }).data;
+		if (Array.isArray(data)) return data as IDataObject[];
 	}
 
 	return [];
@@ -687,7 +698,7 @@ export async function uptimeifyApiRequestAllItems(
 - [ ] **Step 4: Test laufen lassen, Erfolg bestätigen**
 
 Run: `npx vitest run test/transport.test.ts`
-Expected: 5 Tests PASS.
+Expected: 6 Tests PASS.
 
 - [ ] **Step 5: Typprüfung**
 
