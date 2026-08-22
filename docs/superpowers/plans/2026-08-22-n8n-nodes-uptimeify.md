@@ -2319,3 +2319,630 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 8: Ressourcen *Customer*, *Customer Domain*, *Customer IP*
+
+Drei Ressourcen in einer Aufgabe, weil Domains und IPs unter dem Kunden angelegt werden und die
+drei zusammen erst einen sinnvollen Durchstich ergeben.
+
+**Files:**
+- Create: `nodes/Uptimeify/resources/customer/index.ts`, `.../customer/execute.ts`
+- Create: `nodes/Uptimeify/resources/customerDomain/index.ts`, `.../customerDomain/execute.ts`
+- Create: `nodes/Uptimeify/resources/customerIp/index.ts`, `.../customerIp/execute.ts`
+- Modify: `nodes/Uptimeify/Uptimeify.node.ts`
+
+**Interfaces:**
+- Consumes: `ResourceExecute`, `customerLocator`, `returnAllProperties`, Transport
+- Produces: `customerDescription` / `executeCustomer`, `customerDomainDescription` / `executeCustomerDomain`, `customerIpDescription` / `executeCustomerIp`
+
+Endpunkte, verifiziert am Routen-Baum:
+
+| Operation | Methode und Pfad |
+|---|---|
+| Customer: Get Many | `GET /api/customers` (nacktes Array, `fields=minimal` optional) |
+| Customer: Create | `POST /api/customers` |
+| Customer: Get | `GET /api/customers/:customerPublicId` |
+| Customer: Update | `PATCH /api/customers/:customerPublicId` |
+| Customer: Bulk Action | `POST /api/customers/bulk` |
+| Customer: Get SMS Usage | `GET /api/customers/sms-usage` |
+| Customer Domain: Create | `POST /api/customers/:customerPublicId/domains` |
+| Customer Domain: Get Many | `GET /api/customer-domains` (Seiten-Pagination) |
+| Customer Domain: Get / Update / Delete | `GET|PATCH|DELETE /api/customer-domains/:id` |
+| Customer IP: Create | `POST /api/customers/:customerPublicId/ips` |
+| Customer IP: Get Many | `GET /api/customer-ips` (Seiten-Pagination) |
+| Customer IP: Get / Update / Delete | `GET|PATCH|DELETE /api/customer-ips/:id` |
+
+- [ ] **Step 1: Ressource Customer schreiben**
+
+`nodes/Uptimeify/resources/customer/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['customer'], operation: [operation] });
+
+export const customerDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['customer'] } },
+		options: [
+			{ name: 'Bulk Action', value: 'bulk', action: 'Run a bulk action on customers' },
+			{ name: 'Create', value: 'create', action: 'Create a customer' },
+			{ name: 'Get', value: 'get', action: 'Get a customer' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many customers' },
+			{ name: 'Get SMS Usage', value: 'getSmsUsage', action: 'Get SMS usage' },
+			{ name: 'Update', value: 'update', action: 'Update a customer' },
+		],
+		default: 'getAll',
+	},
+
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Email',
+		name: 'email',
+		type: 'string',
+		placeholder: 'name@email.com',
+		default: '',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Package Type',
+		name: 'packageType',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Package key or display name configured for your organization',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('create') },
+		options: [
+			{
+				displayName: 'Allow Self Service',
+				name: 'allowSelfService',
+				type: 'boolean',
+				default: false,
+				description: 'Whether the customer may create self-service monitors',
+			},
+			{
+				displayName: 'Can Edit Managed',
+				name: 'canEditManaged',
+				type: 'boolean',
+				default: false,
+				description: 'Whether the customer may edit managed monitors',
+			},
+			{
+				displayName: 'Max Self Service URLs',
+				name: 'maxSelfServiceUrls',
+				type: 'number',
+				default: 0,
+				description: 'Cap across all monitor types. Zero means inherit from the package.',
+			},
+			{
+				displayName: 'Monthly Reports Enabled',
+				name: 'monthlyReportsEnabled',
+				type: 'boolean',
+				default: true,
+			},
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+
+	{
+		...customerLocator,
+		displayOptions: { show: { resource: ['customer'], operation: ['get', 'update'] } },
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{ displayName: 'Email', name: 'email', type: 'string', placeholder: 'name@email.com', default: '' },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{ displayName: 'Package Type', name: 'packageType', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+
+	{
+		displayName: 'Action',
+		name: 'bulkAction',
+		type: 'string',
+		default: '',
+		required: true,
+		description: 'Bulk action name as documented under Customer Management, Bulk Actions',
+		displayOptions: { show: show('bulk') },
+	},
+	{
+		displayName: 'Customer IDs',
+		name: 'bulkCustomerIds',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. 101,102,103',
+		description: 'Comma-separated customer IDs, at most 200',
+		displayOptions: { show: show('bulk') },
+	},
+
+	...returnAllProperties('customer', 'getAll'),
+	{
+		displayName: 'Minimal Fields',
+		name: 'minimal',
+		type: 'boolean',
+		default: false,
+		description:
+			'Whether to return only ID, public ID, name, status and custom fields. Much smaller responses.',
+		displayOptions: { show: show('getAll') },
+	},
+];
+```
+
+`nodes/Uptimeify/resources/customer/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeCustomer: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const body: IDataObject = {
+			name: this.getNodeParameter('name', itemIndex) as string,
+			email: this.getNodeParameter('email', itemIndex) as string,
+			packageType: this.getNodeParameter('packageType', itemIndex) as string,
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+		};
+
+		return (await uptimeifyApiRequest.call(this, 'POST', '/api/customers', body)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+		const minimal = this.getNodeParameter('minimal', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/customers',
+			minimal ? { fields: 'minimal' } : {},
+			{
+				mode: 'array',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	if (operation === 'getSmsUsage') {
+		return (await uptimeifyApiRequest.call(this, 'GET', '/api/customers/sms-usage')) as IDataObject;
+	}
+
+	if (operation === 'bulk') {
+		const ids = (this.getNodeParameter('bulkCustomerIds', itemIndex) as string)
+			.split(',')
+			.map((id) => id.trim())
+			.filter((id) => id !== '')
+			.map((id) => Number(id));
+
+		const body: IDataObject = {
+			action: this.getNodeParameter('bulkAction', itemIndex) as string,
+			customerIds: ids,
+		};
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			'/api/customers/bulk',
+			body,
+		)) as IDataObject;
+	}
+
+	const customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
+		extractValue: true,
+	}) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/customers/${customerId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/customers/${customerId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for customers`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 2: Ressource Customer Domain schreiben**
+
+`nodes/Uptimeify/resources/customerDomain/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['customerDomain'], operation: [operation] });
+
+export const customerDomainDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['customerDomain'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a customer domain' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a customer domain' },
+			{ name: 'Get', value: 'get', action: 'Get a customer domain' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many customer domains' },
+			{ name: 'Update', value: 'update', action: 'Update a customer domain' },
+		],
+		default: 'getAll',
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'Domain Name',
+		name: 'domainName',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. example.com',
+		description: 'Domain without a protocol and without a path',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Domain ID',
+		name: 'domainId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: {
+			show: { resource: ['customerDomain'], operation: ['delete', 'get', 'update'] },
+		},
+	},
+	{
+		displayName: 'Fields',
+		name: 'fields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: {
+			show: { resource: ['customerDomain'], operation: ['create', 'update'] },
+		},
+		options: [
+			{
+				displayName: 'Domain Name',
+				name: 'domainName',
+				type: 'string',
+				default: '',
+				description: 'Only used when updating',
+			},
+			{ displayName: 'Expiry Error Days', name: 'expiryErrorDays', type: 'number', default: 7 },
+			{ displayName: 'Expiry Warning Days', name: 'expiryWarningDays', type: 'number', default: 30 },
+			{ displayName: 'Label', name: 'label', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+
+	...returnAllProperties('customerDomain', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/customerDomain/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeCustomerDomain: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
+			extractValue: true,
+		}) as string;
+
+		const body: IDataObject = {
+			domainName: this.getNodeParameter('domainName', itemIndex) as string,
+			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+		};
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			`/api/customers/${customerId}/domains`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/customer-domains',
+			{},
+			{
+				mode: 'page',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const domainId = this.getNodeParameter('domainId', itemIndex) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/customer-domains/${domainId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/customer-domains/${domainId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/customer-domains/${domainId}`);
+		return { success: true, domainId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for customer domains`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 3: Ressource Customer IP schreiben**
+
+`nodes/Uptimeify/resources/customerIp/index.ts`: identisch aufgebaut zur Domain-Ressource,
+mit diesen Abweichungen:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import { customerLocator, returnAllProperties } from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['customerIp'], operation: [operation] });
+
+export const customerIpDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['customerIp'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a customer IP' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a customer IP' },
+			{ name: 'Get', value: 'get', action: 'Get a customer IP' },
+			{ name: 'Get Many', value: 'getAll', action: 'Get many customer IPs' },
+			{ name: 'Update', value: 'update', action: 'Update a customer IP' },
+		],
+		default: 'getAll',
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'IP Address',
+		name: 'ipAddress',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. 203.0.113.10',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'IP ID',
+		name: 'ipId',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: { resource: ['customerIp'], operation: ['delete', 'get', 'update'] } },
+	},
+	{
+		displayName: 'Fields',
+		name: 'fields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['customerIp'], operation: ['create', 'update'] } },
+		options: [
+			{
+				displayName: 'IP Family',
+				name: 'ipFamily',
+				type: 'options',
+				options: [
+					{ name: 'IPv4', value: 'v4' },
+					{ name: 'IPv6', value: 'v6' },
+				],
+				default: 'v4',
+				description: 'Inferred from the address when omitted. Has to match the address.',
+			},
+			{ displayName: 'Label', name: 'label', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+
+	...returnAllProperties('customerIp', 'getAll'),
+];
+```
+
+`nodes/Uptimeify/resources/customerIp/execute.ts`:
+
+```ts
+import type { IDataObject } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+export const executeCustomerIp: ResourceExecute = async function (this, operation, itemIndex) {
+	if (operation === 'create') {
+		const customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
+			extractValue: true,
+		}) as string;
+
+		const body: IDataObject = {
+			ipAddress: this.getNodeParameter('ipAddress', itemIndex) as string,
+			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+		};
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			`/api/customers/${customerId}/ips`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			'/api/customer-ips',
+			{},
+			{
+				mode: 'page',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const ipId = this.getNodeParameter('ipId', itemIndex) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'GET',
+			`/api/customer-ips/${ipId}`,
+		)) as IDataObject;
+	}
+
+	if (operation === 'update') {
+		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`/api/customer-ips/${ipId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `/api/customer-ips/${ipId}`);
+		return { success: true, ipId };
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for customer IPs`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 4: Ressourcen im Node registrieren**
+
+Importe ergänzen, `RESOURCE_EXECUTORS` um `customer`, `customerDomain`, `customerIp` erweitern,
+die drei Optionen im `resource`-Property alphabetisch einsortieren (Customer, Customer Domain,
+Customer IP, Monitor, Website) und die drei Description-Arrays in `properties` aufnehmen.
+
+- [ ] **Step 5: Bauen und linten**
+
+Run: `npm run build && npm run lint`
+Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add nodes/Uptimeify
+git commit -m "feat: add customer, customer domain and customer IP resources
+
+Domain expiry and DNSBL monitoring live under the customer, not under a monitor
+endpoint of their own, so they follow the customer resource.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
