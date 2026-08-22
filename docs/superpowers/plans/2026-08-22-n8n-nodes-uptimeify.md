@@ -1653,3 +1653,669 @@ Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
 ```
 
 ---
+### Task 7: Ressource *Monitor*
+
+**Files:**
+- Create: `nodes/Uptimeify/resources/monitor/index.ts`, `nodes/Uptimeify/resources/monitor/execute.ts`
+- Modify: `nodes/Uptimeify/Uptimeify.node.ts`
+
+**Interfaces:**
+- Consumes: `ResourceExecute` (Task 6), `MONITOR_TYPE_OPTIONS`, `MONITOR_PATHS`, `MONITOR_CONFIG_KEYS`, `customerLocator`, `monitorLocator`, `returnAllProperties` (Task 5), Transport (Task 4)
+- Produces: `monitorDescription: INodeProperties[]`, `executeMonitor: ResourceExecute`
+
+Der Parameter `monitorType` steht **vor** allen anderen Feldern der Ressource, weil
+`getMonitors` ihn liest, um die richtige Liste zu laden.
+
+- [ ] **Step 1: Properties schreiben**
+
+`nodes/Uptimeify/resources/monitor/index.ts`:
+
+```ts
+import type { INodeProperties } from 'n8n-workflow';
+import {
+	customerLocator,
+	monitorLocator,
+	MONITOR_TYPE_OPTIONS,
+	returnAllProperties,
+} from '../../shared/descriptions';
+
+const show = (operation: string) => ({ resource: ['monitor'], operation: [operation] });
+const showType = (monitorType: string, operations: string[]) => ({
+	resource: ['monitor'],
+	operation: operations,
+	monitorType: [monitorType],
+});
+
+const WRITE_OPERATIONS = ['create', 'update'];
+
+export const monitorDescription: INodeProperties[] = [
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['monitor'] } },
+		options: [
+			{ name: 'Create', value: 'create', action: 'Create a monitor' },
+			{ name: 'Delete', value: 'delete', action: 'Delete a monitor' },
+			{ name: 'Get', value: 'get', action: 'Get a monitor' },
+			{ name: 'Get Alert History', value: 'getAlertHistory', action: 'Get monitor alert history' },
+			{ name: 'Get Check History', value: 'getCheckHistory', action: 'Get monitor check history' },
+			{
+				name: 'Get Incident History',
+				value: 'getIncidentHistory',
+				action: 'Get monitor incident history',
+			},
+			{ name: 'Get Many', value: 'getAll', action: 'Get many monitors' },
+			{ name: 'Trigger Check', value: 'triggerCheck', action: 'Trigger a monitor check' },
+			{ name: 'Update', value: 'update', action: 'Update a monitor' },
+		],
+		default: 'getAll',
+	},
+	{
+		displayName: 'Monitor Type',
+		name: 'monitorType',
+		type: 'options',
+		noDataExpression: true,
+		options: MONITOR_TYPE_OPTIONS,
+		default: 'icmp',
+		required: true,
+		description: 'Which kind of monitor to work with. It decides the endpoint that is called.',
+		displayOptions: { show: { resource: ['monitor'] } },
+	},
+
+	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		displayName: 'Name',
+		name: 'name',
+		type: 'string',
+		default: '',
+		required: true,
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Hostname',
+		name: 'hostname',
+		type: 'string',
+		default: '',
+		required: true,
+		placeholder: 'e.g. mail.example.com',
+		description: 'Hostname or IP only, without a protocol and without a path',
+		displayOptions: { show: show('create') },
+	},
+	{
+		displayName: 'Port',
+		name: 'port',
+		type: 'number',
+		default: 6379,
+		required: true,
+		typeOptions: { minValue: 1, maxValue: 65535 },
+		description: 'TCP monitors have no default port, so it has to be set',
+		displayOptions: { show: showType('tcp', ['create']) },
+	},
+
+	{
+		...monitorLocator,
+		displayOptions: {
+			show: {
+				resource: ['monitor'],
+				operation: [
+					'delete',
+					'get',
+					'getAlertHistory',
+					'getCheckHistory',
+					'getIncidentHistory',
+					'triggerCheck',
+					'update',
+				],
+			},
+		},
+	},
+
+	{
+		displayName: 'Common Fields',
+		name: 'commonFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['monitor'], operation: WRITE_OPERATIONS } },
+		options: [
+			{
+				displayName: 'Check Interval (Minutes)',
+				name: 'checkInterval',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 1440 },
+				default: 30,
+			},
+			{ displayName: 'Hostname', name: 'hostname', type: 'string', default: '' },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{
+				displayName: 'Port',
+				name: 'port',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 65535 },
+				default: 0,
+			},
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Disabled', value: 'disabled' },
+					{ name: 'Maintenance', value: 'maintenance' },
+				],
+				default: 'active',
+			},
+			{
+				displayName: 'Timeout (Seconds)',
+				name: 'timeoutSeconds',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+		],
+	},
+	{
+		displayName: 'Check Mode',
+		name: 'checkMode',
+		type: 'options',
+		options: [
+			{ name: 'Protocol', value: 'protocol' },
+			{ name: 'TCP', value: 'tcp' },
+		],
+		default: 'protocol',
+		description:
+			'TCP mode only checks that the port answers, so no credentials are needed or stored. IMAP/POP additionally needs an explicit port in TCP mode.',
+		displayOptions: {
+			show: {
+				resource: ['monitor'],
+				operation: WRITE_OPERATIONS,
+				monitorType: ['smtp', 'ssh', 'ftp', 'imap-pop'],
+			},
+		},
+	},
+
+	{
+		displayName: 'RR Types',
+		name: 'rrtypes',
+		type: 'multiOptions',
+		options: [
+			{ name: 'A', value: 'A' },
+			{ name: 'AAAA', value: 'AAAA' },
+			{ name: 'CNAME', value: 'CNAME' },
+			{ name: 'MX', value: 'MX' },
+			{ name: 'NS', value: 'NS' },
+			{ name: 'SOA', value: 'SOA' },
+			{ name: 'TXT', value: 'TXT' },
+		],
+		default: ['A'],
+		required: true,
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+	},
+	{
+		displayName: 'Match Mode',
+		name: 'matchMode',
+		type: 'options',
+		options: [
+			{ name: 'Contains', value: 'contains' },
+			{ name: 'Exact', value: 'exact' },
+		],
+		default: 'exact',
+		required: true,
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+	},
+	{
+		displayName: 'Expected Values',
+		name: 'expectedValues',
+		type: 'fixedCollection',
+		typeOptions: { multipleValues: true },
+		placeholder: 'Add Expected Value',
+		default: {},
+		required: true,
+		description: 'Every RR type listed above needs at least one expected value',
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Value',
+				name: 'value',
+				values: [
+					{
+						displayName: 'RR Type',
+						name: 'rrtype',
+						type: 'string',
+						default: 'A',
+						placeholder: 'e.g. A',
+					},
+					{
+						displayName: 'Values',
+						name: 'values',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. 93.184.216.34, 93.184.216.35',
+						description: 'Comma-separated list of expected records',
+					},
+				],
+			},
+		],
+	},
+	{
+		displayName: 'DNS Options',
+		name: 'dnsOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('dns', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Trigger on Mismatch',
+				name: 'mismatch',
+				type: 'boolean',
+				default: true,
+				description: 'Whether an answer that differs from the expected values raises an incident',
+			},
+			{
+				displayName: 'Trigger on Resolve Error',
+				name: 'resolveError',
+				type: 'boolean',
+				default: true,
+				description: 'Whether a failed resolution raises an incident',
+			},
+		],
+	},
+
+	{
+		displayName: 'ICMP Options',
+		name: 'icmpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('icmp', WRITE_OPERATIONS) },
+		options: [
+			{ displayName: 'Count', name: 'count', type: 'number', default: 4 },
+			{ displayName: 'Packet Size', name: 'packetSize', type: 'number', default: 56 },
+		],
+	},
+	{
+		displayName: 'TCP Options',
+		name: 'tcpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('tcp', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Expect Banner',
+				name: 'expectBanner',
+				type: 'string',
+				default: '',
+				description: 'String the service has to answer with',
+			},
+		],
+	},
+	{
+		displayName: 'SMTP Options',
+		name: 'smtpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('smtp', WRITE_OPERATIONS) },
+		options: [
+			{ displayName: 'Ignore TLS', name: 'ignoreTls', type: 'boolean', default: false },
+			{
+				displayName: 'Password',
+				name: 'pass',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{ displayName: 'Require TLS', name: 'requireTls', type: 'boolean', default: false },
+			{
+				displayName: 'Secure',
+				name: 'secure',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to connect over implicit TLS, which defaults the port to 465',
+			},
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'SSH Options',
+		name: 'sshOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('ssh', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Private Key',
+				name: 'privateKey',
+				type: 'string',
+				typeOptions: { password: true, rows: 4 },
+				default: '',
+			},
+			{ displayName: 'Username', name: 'username', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'FTP Options',
+		name: 'ftpOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('ftp', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Secure',
+				name: 'secure',
+				type: 'options',
+				options: [
+					{ name: 'Explicit TLS', value: 'true' },
+					{ name: 'Implicit TLS', value: 'implicit' },
+					{ name: 'Plain FTP', value: 'false' },
+				],
+				default: 'false',
+			},
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+	{
+		displayName: 'IMAP/POP Options',
+		name: 'imapPopOptions',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
+		displayOptions: { show: showType('imap-pop', WRITE_OPERATIONS) },
+		options: [
+			{
+				displayName: 'Password',
+				name: 'password',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+			},
+			{
+				displayName: 'Protocol',
+				name: 'protocol',
+				type: 'options',
+				options: [
+					{ name: 'IMAP', value: 'imap' },
+					{ name: 'POP3', value: 'pop3' },
+				],
+				default: 'imap',
+			},
+			{ displayName: 'TLS', name: 'tls', type: 'boolean', default: true },
+			{ displayName: 'Username', name: 'user', type: 'string', default: '' },
+		],
+	},
+
+	...returnAllProperties('monitor', 'getAll'),
+	...returnAllProperties('monitor', 'getCheckHistory'),
+	...returnAllProperties('monitor', 'getAlertHistory'),
+	...returnAllProperties('monitor', 'getIncidentHistory'),
+];
+```
+
+- [ ] **Step 2: `execute` schreiben**
+
+`nodes/Uptimeify/resources/monitor/execute.ts`:
+
+```ts
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { MONITOR_CONFIG_KEYS, MONITOR_PATHS } from '../../shared/descriptions';
+import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
+import type { ResourceExecute } from '../../shared/types';
+
+type ExpectedValueEntry = { rrtype: string; values: string };
+
+function splitList(raw: string): string[] {
+	return raw
+		.split(',')
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== '');
+}
+
+/** Builds the type-specific config object under its own key, e.g. `dnsConfig` for DNS. */
+function buildConfig(
+	context: IExecuteFunctions,
+	monitorType: string,
+	itemIndex: number,
+): IDataObject | undefined {
+	if (monitorType === 'dns') {
+		const entries = (
+			(context.getNodeParameter('expectedValues', itemIndex) as IDataObject).value ?? []
+		) as unknown as ExpectedValueEntry[];
+
+		const expectedValues: IDataObject = {};
+		for (const entry of entries) {
+			expectedValues[entry.rrtype] = splitList(entry.values);
+		}
+
+		const options = context.getNodeParameter('dnsOptions', itemIndex) as IDataObject;
+
+		return {
+			rrtypes: context.getNodeParameter('rrtypes', itemIndex) as string[],
+			matchMode: context.getNodeParameter('matchMode', itemIndex) as string,
+			expectedValues,
+			triggerOn: {
+				resolveError: options.resolveError ?? true,
+				mismatch: options.mismatch ?? true,
+			},
+		};
+	}
+
+	const optionParameter: Record<string, string> = {
+		icmp: 'icmpOptions',
+		tcp: 'tcpOptions',
+		smtp: 'smtpOptions',
+		ssh: 'sshOptions',
+		ftp: 'ftpOptions',
+		'imap-pop': 'imapPopOptions',
+	};
+
+	const parameterName = optionParameter[monitorType];
+	if (parameterName === undefined) return undefined;
+
+	const options = context.getNodeParameter(parameterName, itemIndex) as IDataObject;
+	if (Object.keys(options).length === 0) return undefined;
+
+	if (monitorType === 'smtp') {
+		const { user, pass, ...rest } = options;
+		return user === undefined && pass === undefined ? rest : { ...rest, auth: { user, pass } };
+	}
+
+	if (monitorType === 'ftp' && typeof options.secure === 'string') {
+		const secure = options.secure === 'implicit' ? 'implicit' : options.secure === 'true';
+		return { ...options, secure };
+	}
+
+	return options;
+}
+
+export const executeMonitor: ResourceExecute = async function (this, operation, itemIndex) {
+	const monitorType = this.getNodeParameter('monitorType', itemIndex) as string;
+	const basePath = MONITOR_PATHS[monitorType];
+
+	if (basePath === undefined) {
+		throw new NodeOperationError(this.getNode(), `Unknown monitor type "${monitorType}"`, {
+			itemIndex,
+		});
+	}
+
+	if (operation === 'create' || operation === 'update') {
+		const common = this.getNodeParameter('commonFields', itemIndex) as IDataObject;
+		const body: IDataObject = { ...common };
+
+		if (operation === 'create') {
+			body.customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
+				extractValue: true,
+			}) as string;
+			body.name = this.getNodeParameter('name', itemIndex) as string;
+			body.hostname = this.getNodeParameter('hostname', itemIndex) as string;
+
+			if (monitorType === 'tcp') body.port = this.getNodeParameter('port', itemIndex) as number;
+		}
+
+		if (['smtp', 'ssh', 'ftp', 'imap-pop'].includes(monitorType)) {
+			body.checkMode = this.getNodeParameter('checkMode', itemIndex) as string;
+		}
+
+		if (body.checkMode !== 'tcp') {
+			const config = buildConfig(this, monitorType, itemIndex);
+			if (config !== undefined) body[MONITOR_CONFIG_KEYS[monitorType]] = config;
+		}
+
+		if (operation === 'create') {
+			return (await uptimeifyApiRequest.call(this, 'POST', basePath, body)) as IDataObject;
+		}
+
+		const monitorId = this.getNodeParameter('monitorId', itemIndex, undefined, {
+			extractValue: true,
+		}) as string;
+
+		return (await uptimeifyApiRequest.call(
+			this,
+			'PATCH',
+			`${basePath}/${monitorId}`,
+			body,
+		)) as IDataObject;
+	}
+
+	if (operation === 'getAll') {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+
+		return await uptimeifyApiRequestAllItems.call(
+			this,
+			basePath,
+			{},
+			{
+				mode: 'page',
+				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+			},
+		);
+	}
+
+	const monitorId = this.getNodeParameter('monitorId', itemIndex, undefined, {
+		extractValue: true,
+	}) as string;
+
+	if (operation === 'get') {
+		return (await uptimeifyApiRequest.call(this, 'GET', `${basePath}/${monitorId}`)) as IDataObject;
+	}
+
+	if (operation === 'delete') {
+		await uptimeifyApiRequest.call(this, 'DELETE', `${basePath}/${monitorId}`);
+		return { success: true, monitorId };
+	}
+
+	if (operation === 'triggerCheck') {
+		return (await uptimeifyApiRequest.call(
+			this,
+			'POST',
+			`${basePath}/${monitorId}/trigger-check`,
+			{},
+		)) as IDataObject;
+	}
+
+	const historyPaths: Record<string, string> = {
+		getCheckHistory: 'check-history',
+		getAlertHistory: 'alert-history',
+		getIncidentHistory: 'incident-history',
+	};
+
+	const segment = historyPaths[operation];
+
+	if (segment !== undefined) {
+		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
+		const limit = returnAll ? 200 : (this.getNodeParameter('limit', itemIndex) as number);
+
+		const rows = await uptimeifyApiRequestAllItems.call(
+			this,
+			`${basePath}/${monitorId}/${segment}`,
+			{ limit: Math.min(limit, 200) },
+			{ mode: 'array', limit: returnAll ? undefined : limit },
+		);
+
+		return rows;
+	}
+
+	throw new NodeOperationError(
+		this.getNode(),
+		`The operation "${operation}" is not supported for monitors`,
+		{ itemIndex },
+	);
+};
+```
+
+- [ ] **Step 3: Ressource im Node registrieren**
+
+In `nodes/Uptimeify/Uptimeify.node.ts`:
+
+```ts
+import { monitorDescription } from './resources/monitor';
+import { executeMonitor } from './resources/monitor/execute';
+```
+
+`RESOURCE_EXECUTORS` ergänzen:
+
+```ts
+const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
+	monitor: executeMonitor,
+	website: executeWebsite,
+};
+```
+
+Im Property `resource` die Option ergänzen (alphabetisch, Monitor vor Website) und
+`...monitorDescription` in `properties` aufnehmen:
+
+```ts
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{ name: 'Monitor', value: 'monitor' },
+					{ name: 'Website', value: 'website' },
+				],
+				default: 'website',
+			},
+			...monitorDescription,
+			...websiteDescription,
+```
+
+- [ ] **Step 4: Bauen und linten**
+
+Run: `npm run build && npm run lint`
+Expected: Build erfolgreich, Lint ohne Fehler und ohne Warnungen.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add nodes/Uptimeify
+git commit -m "feat: add the monitor resource for all seven service monitor types
+
+One monitor type parameter picks the endpoint prefix and the name of the config
+object in the body. DNS expected values are entered per record type; the
+credentialed types offer TCP check mode, which stores no credentials.
+
+Claude-Session: https://claude.ai/code/session_01K46SskZa8g9MQyeeNRCHUQ"
+```
+
+---
