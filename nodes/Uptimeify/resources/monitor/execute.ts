@@ -112,6 +112,8 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		const body: IDataObject = { ...common };
 
 		if (operation === 'create') {
+			// Set after the spread so the required top-level fields always win, even if the
+			// user also filled in the commonFields collection's Name option.
 			body.customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
 				extractValue: true,
 			}) as string;

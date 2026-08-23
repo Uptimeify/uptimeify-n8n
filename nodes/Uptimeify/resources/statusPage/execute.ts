@@ -5,12 +5,16 @@ import type { ResourceExecute } from '../../shared/types';
 
 export const executeStatusPage: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
+		const customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
+			extractValue: true,
+		}) as string;
+
 		const body: IDataObject = {
-			customerId: this.getNodeParameter('customerId', itemIndex, undefined, {
-				extractValue: true,
-			}) as string,
-			name: this.getNodeParameter('name', itemIndex) as string,
 			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+			// Set after the spread so the required top-level fields always win, even if the
+			// user also filled in the collection's "Only used when updating" Name option.
+			customerId,
+			name: this.getNodeParameter('name', itemIndex) as string,
 		};
 
 		return (await uptimeifyApiRequest.call(this, 'POST', '/api/status-pages', body)) as IDataObject;
