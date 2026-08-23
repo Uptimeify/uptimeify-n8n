@@ -130,17 +130,14 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 			body.checkMode = this.getNodeParameter('checkMode', itemIndex) as string;
 		}
 
-		// `checkMode === 'tcp'` never wants a protocol config. On update, `checkMode` being
-		// absent means the user didn't touch it, so the monitor's stored mode is unknown here -
-		// for the credentialed types that ambiguity has to block building the config too, or an
-		// update could start sending a protocol config (with credentials) to a monitor that is
-		// actually running in TCP mode. Non-credentialed types (DNS/ICMP/TCP) never have a
-		// `checkMode` at all, so their config always builds as before.
-		const skipConfig =
-			isCredentialedType &&
-			(body.checkMode === 'tcp' || (operation === 'update' && body.checkMode === undefined));
-
-		if (!skipConfig) {
+		// `checkMode === 'tcp'` - sent explicitly in this request - means no protocol config
+		// is wanted: TCP mode stores no credentials. Otherwise (checkMode absent, set to
+		// 'protocol', or not applicable to this monitor type at all) build the config from the
+		// type-specific options collection and let `buildConfig` decide whether there's anything
+		// to send - it returns `undefined` for an untouched/empty options collection, which means
+		// the user isn't editing the config, so nothing about it should be sent. This keys off the
+		// options the user actually filled in, not off whether `checkMode` happened to be included.
+		if (body.checkMode !== 'tcp') {
 			const config = buildConfig(this, monitorType, itemIndex);
 			if (config !== undefined) body[MONITOR_CONFIG_KEYS[monitorType]] = config;
 		}
