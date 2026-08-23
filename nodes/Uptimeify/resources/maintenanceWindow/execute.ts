@@ -1,5 +1,6 @@
 import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
+import { parsePositiveIntegers, splitList } from '../../shared/lists';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
@@ -27,15 +28,31 @@ function buildWindowBody(context: IExecuteFunctions, itemIndex: number): IDataOb
 	if (targeting === 'targets') {
 		const entries = ((context.getNodeParameter('targets', itemIndex) as IDataObject).target ??
 			[]) as unknown as TargetEntry[];
-		body.targets = entries.map((entry) => ({ type: entry.type, id: entry.id }));
+
+		if (entries.length === 0) {
+			throw new NodeOperationError(context.getNode(), 'Targets list is empty', { itemIndex });
+		}
+
+		body.targets = entries.map((entry) => {
+			if (typeof entry.id !== 'string' || entry.id.trim() === '') {
+				throw new NodeOperationError(
+					context.getNode(),
+					`Targets row of type "${entry.type}" has a blank ID`,
+					{ itemIndex },
+				);
+			}
+			return { type: entry.type, id: entry.id };
+		});
 	}
 
 	if (targeting === 'tags') {
-		body.tagIds = (context.getNodeParameter('tagIds', itemIndex) as string)
-			.split(',')
-			.map((id) => id.trim())
-			.filter((id) => id !== '')
-			.map((id) => Number(id));
+		const entries = splitList(context.getNodeParameter('tagIds', itemIndex) as string);
+
+		if (entries.length === 0) {
+			throw new NodeOperationError(context.getNode(), 'Tag IDs list is empty', { itemIndex });
+		}
+
+		body.tagIds = parsePositiveIntegers(context, entries, 'Tag ID', itemIndex);
 	}
 
 	return body;

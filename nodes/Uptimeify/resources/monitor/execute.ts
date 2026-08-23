@@ -1,17 +1,11 @@
 import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { MONITOR_CONFIG_KEYS, MONITOR_PATHS } from '../../shared/descriptions';
+import { splitList } from '../../shared/lists';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
 type ExpectedValueEntry = { rrtype: string; values: string };
-
-function splitList(raw: string): string[] {
-	return raw
-		.split(',')
-		.map((entry) => entry.trim())
-		.filter((entry) => entry !== '');
-}
 
 /** Builds the type-specific config object under its own key, e.g. `dnsConfig` for DNS. */
 export function buildConfig(

@@ -1,16 +1,10 @@
 import type { IDataObject } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
+import { parsePositiveIntegers, splitList } from '../../shared/lists';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
 const MAX_BULK_CUSTOMER_IDS = 200;
-
-function splitList(raw: string): string[] {
-	return raw
-		.split(',')
-		.map((entry) => entry.trim())
-		.filter((entry) => entry !== '');
-}
 
 export const executeCustomer: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
@@ -58,17 +52,7 @@ export const executeCustomer: ResourceExecute = async function (this, operation,
 			);
 		}
 
-		const ids = entries.map((entry) => {
-			const id = Number(entry);
-			if (!Number.isInteger(id) || id <= 0) {
-				throw new NodeOperationError(
-					this.getNode(),
-					`Customer ID "${entry}" is not a positive integer`,
-					{ itemIndex },
-				);
-			}
-			return id;
-		});
+		const ids = parsePositiveIntegers(this, entries, 'Customer ID', itemIndex);
 
 		const body: IDataObject = {
 			action: this.getNodeParameter('bulkAction', itemIndex) as string,

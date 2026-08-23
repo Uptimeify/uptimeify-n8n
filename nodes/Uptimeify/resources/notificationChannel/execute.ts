@@ -1,11 +1,27 @@
-import type { IDataObject } from 'n8n-workflow';
+import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
-function parseJsonParameter(raw: unknown): IDataObject {
+/**
+ * `config` is user-typed JSON, so a typo shouldn't surface as a raw `SyntaxError` with no
+ * indication of which field or whose input caused it.
+ */
+function parseJsonParameter(
+	context: IExecuteFunctions,
+	raw: unknown,
+	itemIndex: number,
+): IDataObject {
 	if (typeof raw !== 'string') return (raw ?? {}) as IDataObject;
-	return JSON.parse(raw) as IDataObject;
+
+	try {
+		return JSON.parse(raw) as IDataObject;
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : String(error);
+		throw new NodeOperationError(context.getNode(), `Config is not valid JSON: ${reason}`, {
+			itemIndex,
+		});
+	}
 }
 
 export const executeNotificationChannel: ResourceExecute = async function (
@@ -26,7 +42,7 @@ export const executeNotificationChannel: ResourceExecute = async function (
 			// Additional Fields has no colliding keys today - see customerDomain/execute.ts.
 			type: this.getNodeParameter('type', itemIndex) as string,
 			name: this.getNodeParameter('name', itemIndex) as string,
-			config: parseJsonParameter(this.getNodeParameter('config', itemIndex)),
+			config: parseJsonParameter(this, this.getNodeParameter('config', itemIndex), itemIndex),
 		};
 
 		return (await uptimeifyApiRequest.call(
@@ -54,7 +70,7 @@ export const executeNotificationChannel: ResourceExecute = async function (
 	if (operation === 'test') {
 		const body: IDataObject = {
 			type: this.getNodeParameter('testType', itemIndex) as string,
-			config: parseJsonParameter(this.getNodeParameter('config', itemIndex)),
+			config: parseJsonParameter(this, this.getNodeParameter('config', itemIndex), itemIndex),
 		};
 
 		return (await uptimeifyApiRequest.call(
@@ -69,7 +85,7 @@ export const executeNotificationChannel: ResourceExecute = async function (
 
 	if (operation === 'update') {
 		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
-		if (body.config !== undefined) body.config = parseJsonParameter(body.config);
+		if (body.config !== undefined) body.config = parseJsonParameter(this, body.config, itemIndex);
 
 		return (await uptimeifyApiRequest.call(
 			this,
