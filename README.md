@@ -1,73 +1,110 @@
-# @haupt-pascal/n8n-nodes-uptimeify
+# n8n-nodes-uptimeify
 
-This is an n8n community node. It lets you use GitHub Issues in your n8n workflows.
+n8n community nodes for [Uptimeify](https://uptimeify.io), an EU-hosted white-label monitoring
+platform for agencies and MSPs.
 
-[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
+This package adds three nodes:
 
-[Installation](#installation)
-[Operations](#operations)
-[Credentials](#credentials)
-[Compatibility](#compatibility)
-[Usage](#usage)
-[Resources](#resources)
+- **Uptimeify** — manage websites, service monitors, customers, incidents, status pages,
+  maintenance windows, notification channels, tags, and Incident Management.
+- **Uptimeify Trigger** — start a workflow when Uptimeify raises or resolves an alert.
+- **Uptimeify Tools** — run the 20 public network checks. No account needed.
 
 ## Installation
 
-Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
-
-## Operations
-
-- Issues
-    - Get an issue
-    - Get many issues in a repository
-    - Create a new issue
-- Issue Comments
-    - Get many issue comments
+Follow the [community nodes installation guide](https://docs.n8n.io/integrations/community-nodes/installation/)
+and install `@haupt-pascal/n8n-nodes-uptimeify`.
 
 ## Credentials
 
-You can use either access token or OAuth2 to use this node.
+The Uptimeify and Uptimeify Trigger nodes need an API token. Create one in Uptimeify under
+**Settings > API tokens**:
 
-### Access token
+- Leave the customer field **empty** for an organization-wide token. It sees every customer and
+  is the only kind Incident Management accepts.
+- Pick a customer to scope the token to that customer.
 
-1. Open your GitHub profile [Settings](https://github.com/settings/profile).
-2. In the left navigation, select [Developer settings](https://github.com/settings/apps).
-3. In the left navigation, under Personal access tokens, select Tokens (classic).
-4. Select Generate new token > Generate new token (classic).
-5. Enter a descriptive name for your token in the Note field, like n8n integration.
-6. Select the Expiration you'd like for the token, or select No expiration.
-7. Select Scopes for your token. For most of the n8n GitHub nodes, add the `repo` scope.
-    - A token without assigned scopes can only access public information.
-8. Select Generate token.
-9. Copy the token.
+The token is shown once, on creation. Set **Base URL** only if you reach Uptimeify under your own
+white-label domain; it defaults to `https://uptimeify.io`.
 
-Refer to [Creating a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) for more information. Refer to Scopes for OAuth apps for more information on GitHub scopes.
+The Uptimeify Tools node needs no credentials.
 
-![Generated Access token in GitHub](https://docs.github.com/assets/cb-17251/mw-1440/images/help/settings/personal-access-tokens.webp)
+## Operations
 
-### OAuth2
+| Resource | Operations |
+| --- | --- |
+| Customer | Create, Get, Get Many, Update, Bulk Action, Get SMS Usage |
+| Customer Domain | Create, Get, Get Many, Update, Delete |
+| Customer IP | Create, Get, Get Many, Update, Delete |
+| Incident | Get, Get Many, Delete |
+| Incident Management: Incident | Ingest Event, Create, Get, Get Many, Update Status, Resolve |
+| Incident Management: On-Call | Who Is on Call, Get Teams, Get Schedules, Create Schedule Override |
+| Maintenance Window | Create, Get, Get Many, Update, Delete, Preview Occurrences |
+| Monitor | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History |
+| Notification Channel | Create, Get Many, Update, Delete, Test |
+| Status Page | Create, Get Many, Update, Delete |
+| Tag | Create, Get Many, Update, Delete, Assign to Monitor, Remove From Monitor |
+| Website | Create, Get, Get Many, Update, Delete, Trigger Check, Change Status, Get Check History, Get Uptime Stats |
 
-If you're self-hosting n8n, create a new GitHub [OAuth app](https://docs.github.com/en/apps/oauth-apps):
+The Monitor resource covers DNS, ICMP, TCP, SMTP, SSH, FTP and IMAP/POP through a single
+**Monitor Type** field. Domain expiry monitoring lives under Customer Domain, DNSBL monitoring
+under Customer IP.
 
-1. Open your GitHub profile [Settings](https://github.com/settings/profile).
-2. In the left navigation, select [Developer settings](https://github.com/settings/apps).
-3. In the left navigation, select OAuth apps.
-4. Select New OAuth App.
-    - If you haven't created an app before, you may see Register a new application instead. Select it.
-5. Enter an Application name, like n8n integration.
-6. Enter the Homepage URL for your app's website.
-7. If you'd like, add the optional Application description, which GitHub displays to end-users.
-8. From n8n, copy the OAuth Redirect URL and paste it into the GitHub Authorization callback URL.
-9. Select Register application.
-10. Copy the Client ID and Client Secret this generates and add them to your n8n credential.
+For SMTP, SSH, FTP and IMAP/POP monitors, **Check Mode** decides whether the monitor logs in with
+credentials (`Protocol`) or only checks that the port answers (`TCP`, no credentials stored). On
+**Create** it is a standalone field. On **Update** it instead sits inside the **Common Fields**
+options collection and is only sent when you deliberately set it there — this keeps a routine edit
+(renaming the monitor, changing its interval, …) from silently flipping it back to `Protocol`
+mode. Likewise, whether a type-specific config object (e.g. **SMTP Options**) is sent on update
+depends only on whether you filled in that type's options collection, not on whether Check Mode
+was set.
 
-Refer to the [GitHub Authorizing OAuth apps documentation](https://docs.github.com/en/apps/oauth-apps/using-oauth-apps/authorizing-oauth-apps) for more information on the authorization process.
+## Uptimeify Trigger
 
-## Compatibility
+On activation the node creates a webhook notification channel in Uptimeify pointing at its own
+webhook URL, with a generated signing secret. On deactivation it deletes that channel again.
 
-Compatible with n8n@1.60.0 or later
+Every request is verified against the `X-Webhook-Signature` header (HMAC-SHA256 over the raw
+body). A request that does not verify is answered with 401 and does not start the workflow. Turn
+**Verify Signature** off only if a proxy in front of n8n rewrites the request body.
 
-## Resources
+Scope the channel to the whole organization, to one customer, or to a single website. A
+website-level override additionally needs the parent channel's ID.
 
-* [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
-* [GitHub API docs](https://docs.github.com/en/rest/issues)
+## Uptimeify Tools
+
+Rate limits are counted per IP: 120 requests per minute across the endpoint, and 15 to 30 per
+minute per tool (`whois` and `domain_expiry` are the strictest). When a 429 response tells the
+node how many seconds remain until the window resets, the error message states that number;
+otherwise it states the published limits above.
+
+## Notes
+
+- `Status Page: Create` answers with `{ statusPage, dns }`, so the new page is at
+  `$json.statusPage`.
+- Incident Management operations need an organization-wide token **and** Incident Management
+  enabled for the organization. Otherwise the API answers 403 and the node explains which of the
+  two is missing.
+- `Website: Get Check History` and the monitor history operations cap out at 200 entries. There
+  is no pagination on those endpoints.
+
+## Example workflows
+
+**Page the on-call engineer when a site goes down**
+
+`Uptimeify Trigger` (Events: Alert) → `IF` (`{{ $json.incident.error_details.blocking_response }}`
+is empty) → `Uptimeify` (Incident Management: Incident, Ingest Event, payload
+`{{ JSON.stringify($json) }}`).
+
+The `IF` step splits a real outage from a check that a firewall turned away. When
+`blocking_response` is set, an edge rejected the check and the origin may be healthy.
+
+**Check certificates every night**
+
+`Schedule Trigger` (daily) → `Uptimeify` (Website, Get Many, Return All) → `Uptimeify Tools`
+(Check SSL, Host `{{ $json.url.replace(/^https?:\/\//, '').split('/')[0] }}`) → `IF`
+(days remaining below 21) → your notification of choice.
+
+## License
+
+[MIT](LICENSE)
