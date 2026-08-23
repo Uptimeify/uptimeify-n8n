@@ -2,7 +2,7 @@ import type { IDataObject } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
-import { parseJsonParameter } from '../../shared/parse';
+import { assertNonEmptyUpdateBody, parseJsonParameter } from '../../shared/parse';
 
 export const executeNotificationChannel: ResourceExecute = async function (
 	this,
@@ -75,6 +75,7 @@ export const executeNotificationChannel: ResourceExecute = async function (
 
 	if (operation === 'update') {
 		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		assertNonEmptyUpdateBody(this, body, 'Update Fields', itemIndex);
 		if (body.config !== undefined)
 			body.config = parseJsonParameter(this, body.config, 'Config', itemIndex);
 

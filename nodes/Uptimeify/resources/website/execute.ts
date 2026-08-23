@@ -1,5 +1,6 @@
 import type { IDataObject } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
+import { assertNonEmptyUpdateBody } from '../../shared/parse';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
@@ -54,6 +55,7 @@ export const executeWebsite: ResourceExecute = async function (this, operation, 
 
 	if (operation === 'update') {
 		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		assertNonEmptyUpdateBody(this, body, 'Update Fields', itemIndex);
 
 		return (await uptimeifyApiRequest.call(
 			this,

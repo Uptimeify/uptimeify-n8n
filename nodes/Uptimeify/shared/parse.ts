@@ -28,3 +28,24 @@ export function parseJsonParameter(
 		});
 	}
 }
+
+/**
+ * Guards an update body built purely from a collection: a user who never opens it sends `{}`,
+ * and a PATCH with an empty body reports success on a request that changed nothing. Throws a
+ * `NodeOperationError` naming the collection the user should have filled in, matching every
+ * other class of user error in this package.
+ */
+export function assertNonEmptyUpdateBody(
+	context: IExecuteFunctions,
+	body: IDataObject,
+	fieldName: string,
+	itemIndex: number,
+): void {
+	if (Object.keys(body).length === 0) {
+		throw new NodeOperationError(
+			context.getNode(),
+			`${fieldName} is empty. Fill in at least one field to update, or nothing would change.`,
+			{ itemIndex },
+		);
+	}
+}

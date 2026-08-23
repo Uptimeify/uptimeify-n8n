@@ -177,3 +177,36 @@ describe('executeMaintenanceWindow - targets (monitors) targeting', () => {
 		});
 	});
 });
+
+describe('executeMaintenanceWindow - update with an empty body', () => {
+	it('raises naming Update Fields instead of sending a PATCH that changes nothing', async () => {
+		const { context, calls } = createExecuteContext({
+			maintenanceWindowId: 'win_1',
+			updateFields: {},
+		});
+
+		let caught: unknown;
+		try {
+			await executeMaintenanceWindow.call(context, 'update', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('Update Fields');
+		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('sends the PATCH when Update Fields has at least one field set', async () => {
+		const { context, calls } = createExecuteContext({
+			maintenanceWindowId: 'win_1',
+			updateFields: { name: 'Renamed window' },
+		});
+
+		await executeMaintenanceWindow.call(context, 'update', ITEM_INDEX);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].body).toEqual({ name: 'Renamed window' });
+	});
+});
