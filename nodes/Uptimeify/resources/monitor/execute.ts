@@ -14,7 +14,7 @@ function splitList(raw: string): string[] {
 }
 
 /** Builds the type-specific config object under its own key, e.g. `dnsConfig` for DNS. */
-function buildConfig(
+export function buildConfig(
 	context: IExecuteFunctions,
 	monitorType: string,
 	itemIndex: number,
@@ -22,16 +22,44 @@ function buildConfig(
 	if (monitorType === 'dns') {
 		const entries = ((context.getNodeParameter('expectedValues', itemIndex) as IDataObject).value ??
 			[]) as unknown as ExpectedValueEntry[];
+		const rrtypes = context.getNodeParameter('rrtypes', itemIndex) as string[];
 
 		const expectedValues: IDataObject = {};
 		for (const entry of entries) {
-			expectedValues[entry.rrtype] = splitList(entry.values);
+			if (expectedValues[entry.rrtype] !== undefined) {
+				throw new NodeOperationError(
+					context.getNode(),
+					`Expected Values has more than one row for RR type "${entry.rrtype}"`,
+					{ itemIndex },
+				);
+			}
+
+			const values = splitList(entry.values);
+			if (values.length === 0) {
+				throw new NodeOperationError(
+					context.getNode(),
+					`Expected Values for RR type "${entry.rrtype}" has no values`,
+					{ itemIndex },
+				);
+			}
+
+			expectedValues[entry.rrtype] = values;
+		}
+
+		for (const rrtype of rrtypes) {
+			if (expectedValues[rrtype] === undefined) {
+				throw new NodeOperationError(
+					context.getNode(),
+					`RR Types includes "${rrtype}" but Expected Values has no row for it`,
+					{ itemIndex },
+				);
+			}
 		}
 
 		const options = context.getNodeParameter('dnsOptions', itemIndex) as IDataObject;
 
 		return {
-			rrtypes: context.getNodeParameter('rrtypes', itemIndex) as string[],
+			rrtypes,
 			matchMode: context.getNodeParameter('matchMode', itemIndex) as string,
 			expectedValues,
 			triggerOn: {
@@ -93,11 +121,26 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 			if (monitorType === 'tcp') body.port = this.getNodeParameter('port', itemIndex) as number;
 		}
 
-		if (['smtp', 'ssh', 'ftp', 'imap-pop'].includes(monitorType)) {
+		const isCredentialedType = ['smtp', 'ssh', 'ftp', 'imap-pop'].includes(monitorType);
+
+		if (operation === 'create' && isCredentialedType) {
+			// Only create sends `checkMode` unconditionally; on update it lives in `commonFields`
+			// so a rename or other unrelated change doesn't silently flip the monitor back to
+			// protocol mode (see below).
 			body.checkMode = this.getNodeParameter('checkMode', itemIndex) as string;
 		}
 
-		if (body.checkMode !== 'tcp') {
+		// `checkMode === 'tcp'` never wants a protocol config. On update, `checkMode` being
+		// absent means the user didn't touch it, so the monitor's stored mode is unknown here -
+		// for the credentialed types that ambiguity has to block building the config too, or an
+		// update could start sending a protocol config (with credentials) to a monitor that is
+		// actually running in TCP mode. Non-credentialed types (DNS/ICMP/TCP) never have a
+		// `checkMode` at all, so their config always builds as before.
+		const skipConfig =
+			isCredentialedType &&
+			(body.checkMode === 'tcp' || (operation === 'update' && body.checkMode === undefined));
+
+		if (!skipConfig) {
 			const config = buildConfig(this, monitorType, itemIndex);
 			if (config !== undefined) body[MONITOR_CONFIG_KEYS[monitorType]] = config;
 		}

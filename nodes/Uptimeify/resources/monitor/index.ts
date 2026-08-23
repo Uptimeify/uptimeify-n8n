@@ -114,6 +114,24 @@ export const monitorDescription: INodeProperties[] = [
 				typeOptions: { minValue: 1, maxValue: 1440 },
 				default: 30,
 			},
+			{
+				displayName: 'Check Mode',
+				name: 'checkMode',
+				type: 'options',
+				options: [
+					{ name: 'Protocol', value: 'protocol' },
+					{ name: 'TCP', value: 'tcp' },
+				],
+				default: 'protocol',
+				description:
+					'TCP mode only checks that the port answers, so no credentials are needed or stored. IMAP/POP additionally needs an explicit port in TCP mode. Leave unset to keep the monitor on its current mode.',
+				displayOptions: {
+					show: {
+						'/operation': ['update'],
+						'/monitorType': ['smtp', 'ssh', 'ftp', 'imap-pop'],
+					},
+				},
+			},
 			{ displayName: 'Hostname', name: 'hostname', type: 'string', default: '' },
 			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
 			{
@@ -157,7 +175,7 @@ export const monitorDescription: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['monitor'],
-				operation: WRITE_OPERATIONS,
+				operation: ['create'],
 				monitorType: ['smtp', 'ssh', 'ftp', 'imap-pop'],
 			},
 		},
