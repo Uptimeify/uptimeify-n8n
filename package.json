@@ -14,7 +14,7 @@
   "author": { "name": "Pascal Haupt", "email": "pascal@haupt.design" },
   "repository": {
     "type": "git",
-    "url": "https://github.com/haupt-pascal/n8n-nodes-uptimeify.git"
+    "url": "https://github.com/Uptimeify/uptimeify-n8n.git"
   },
   "scripts": {
     "build": "n8n-node build",
