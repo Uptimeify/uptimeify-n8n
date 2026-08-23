@@ -18,8 +18,12 @@ import { customerDomainDescription } from './resources/customerDomain';
 import { executeCustomerDomain } from './resources/customerDomain/execute';
 import { customerIpDescription } from './resources/customerIp';
 import { executeCustomerIp } from './resources/customerIp/execute';
+import { incidentDescription } from './resources/incident';
+import { executeIncident } from './resources/incident/execute';
 import { monitorDescription } from './resources/monitor';
 import { executeMonitor } from './resources/monitor/execute';
+import { statusPageDescription } from './resources/statusPage';
+import { executeStatusPage } from './resources/statusPage/execute';
 import { websiteDescription } from './resources/website';
 import { executeWebsite } from './resources/website/execute';
 import type { ResourceExecute } from './shared/types';
@@ -28,7 +32,9 @@ const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
 	customer: executeCustomer,
 	customerDomain: executeCustomerDomain,
 	customerIp: executeCustomerIp,
+	incident: executeIncident,
 	monitor: executeMonitor,
+	statusPage: executeStatusPage,
 	website: executeWebsite,
 };
 
@@ -56,7 +62,9 @@ export class Uptimeify implements INodeType {
 					{ name: 'Customer', value: 'customer' },
 					{ name: 'Customer Domain', value: 'customerDomain' },
 					{ name: 'Customer IP', value: 'customerIp' },
+					{ name: 'Incident', value: 'incident' },
 					{ name: 'Monitor', value: 'monitor' },
+					{ name: 'Status Page', value: 'statusPage' },
 					{ name: 'Website', value: 'website' },
 				],
 				default: 'website',
@@ -64,7 +72,9 @@ export class Uptimeify implements INodeType {
 			...customerDescription,
 			...customerDomainDescription,
 			...customerIpDescription,
+			...incidentDescription,
 			...monitorDescription,
+			...statusPageDescription,
 			...websiteDescription,
 		],
 	};
