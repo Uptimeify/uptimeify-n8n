@@ -1,36 +1,15 @@
-import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
+import type { IDataObject } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
-
-/**
- * `payload` is user-typed JSON, so a typo shouldn't surface as a raw `SyntaxError` with no
- * indication of which field or whose input caused it. Duplicated from
- * notificationChannel/execute.ts's `parseJsonParameter`, which is module-private there and out
- * of this task's file scope to export.
- */
-function parseJsonParameter(
-	context: IExecuteFunctions,
-	raw: unknown,
-	itemIndex: number,
-): IDataObject {
-	if (typeof raw !== 'string') return (raw ?? {}) as IDataObject;
-
-	try {
-		return JSON.parse(raw) as IDataObject;
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		throw new NodeOperationError(context.getNode(), `Payload is not valid JSON: ${reason}`, {
-			itemIndex,
-		});
-	}
-}
+import { parseJsonParameter } from '../../shared/parse';
 
 export const executeImIncident: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'ingestEvent') {
 		const payload = parseJsonParameter(
 			this,
 			this.getNodeParameter('payload', itemIndex),
+			'Payload',
 			itemIndex,
 		);
 
