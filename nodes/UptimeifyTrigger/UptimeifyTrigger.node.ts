@@ -106,6 +106,12 @@ export class UptimeifyTrigger implements INodeType {
 				const webhookData = this.getWorkflowStaticData('node');
 				const webhookUrl = this.getNodeWebhookUrl('default');
 
+				// `getNodeWebhookUrl` is typed as possibly undefined. Without this guard, an
+				// undefined URL would compare equal to any channel whose config genuinely has no
+				// `url` (email, SMS, Slack, ...), matching the first one and letting `create()` -
+				// the only place a secret is generated - never run for it.
+				if (webhookUrl === undefined) return false;
+
 				const response = await uptimeifyApiRequest.call(this, 'GET', '/api/notification-channels');
 
 				const match = (extractItems(response) as unknown as ChannelRow[]).find(
@@ -114,6 +120,15 @@ export class UptimeifyTrigger implements INodeType {
 
 				if (match === undefined) return false;
 
+				// A remote channel with this URL exists, but the API never returns the signing
+				// secret, so it can only come from this workflow's own static data. A duplicated or
+				// re-imported workflow keeps the webhook URL (it's derived from the workflow/webhook
+				// ID) but not the static data, which would otherwise report "exists" here, skip
+				// `create()`, and leave the trigger rejecting every delivery for lack of a secret.
+				// Treating a missing secret as "does not exist" makes `create()` run and replace the
+				// orphaned channel with a new one that has a fresh secret.
+				if (typeof webhookData.secret !== 'string') return false;
+
 				webhookData.channelId = match.id;
 				return true;
 			},
@@ -121,6 +136,14 @@ export class UptimeifyTrigger implements INodeType {
 			async create(this: IHookFunctions): Promise<boolean> {
 				const webhookData = this.getWorkflowStaticData('node');
 				const webhookUrl = this.getNodeWebhookUrl('default');
+
+				if (webhookUrl === undefined) {
+					throw new NodeOperationError(
+						this.getNode(),
+						"Could not determine this webhook's URL. Save the workflow (so it gets a webhook ID) and activate it again.",
+					);
+				}
+
 				const scope = this.getNodeParameter('scope') as string;
 				const secret = createWebhookSecret();
 

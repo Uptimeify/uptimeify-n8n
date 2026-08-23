@@ -296,3 +296,92 @@ describe('UptimeifyTrigger delete - stale channel handling', () => {
 		expect(staticData.secret).toBe('shh');
 	});
 });
+
+describe('UptimeifyTrigger.checkExists', () => {
+	function createCheckExistsContext(options: {
+		webhookUrl: string | undefined;
+		channels: unknown[];
+		staticData: IDataObject;
+	}): { context: IHookFunctions } {
+		const node = createFakeNode();
+
+		const fakeContext = {
+			getNode: () => node,
+			getNodeWebhookUrl: () => options.webhookUrl,
+			getWorkflowStaticData: () => options.staticData,
+			getCredentials: async () => ({ apiToken: 'wsm_test', baseUrl: 'https://uptimeify.test' }),
+			helpers: {
+				httpRequestWithAuthentication: async () => options.channels,
+			},
+		};
+
+		return { context: fakeContext as unknown as IHookFunctions };
+	}
+
+	it('returns false without a webhook URL, rather than matching a channel with no config.url', async () => {
+		const staticData: IDataObject = {};
+		const { context } = createCheckExistsContext({
+			webhookUrl: undefined,
+			// An email/SMS/Slack channel has no `config.url` at all - `undefined === undefined`
+			// would otherwise match it.
+			channels: [{ id: 7, config: {} }],
+			staticData,
+		});
+
+		const result = await new UptimeifyTrigger().webhookMethods.default.checkExists.call(context);
+
+		expect(result).toBe(false);
+		expect(staticData.channelId).toBeUndefined();
+	});
+
+	it('returns true and restores channelId when a URL match already has a stored secret', async () => {
+		const staticData: IDataObject = { secret: 'shh' };
+		const { context } = createCheckExistsContext({
+			webhookUrl: 'https://n8n.example/webhook/abc',
+			channels: [{ id: 7, config: { url: 'https://n8n.example/webhook/abc' } }],
+			staticData,
+		});
+
+		const result = await new UptimeifyTrigger().webhookMethods.default.checkExists.call(context);
+
+		expect(result).toBe(true);
+		expect(staticData.channelId).toBe(7);
+	});
+
+	it('treats a URL match with no stored secret as not existing, so create() can run again', async () => {
+		// A duplicated or re-imported workflow keeps the webhook URL but not the static data.
+		const staticData: IDataObject = {};
+		const { context } = createCheckExistsContext({
+			webhookUrl: 'https://n8n.example/webhook/abc',
+			channels: [{ id: 7, config: { url: 'https://n8n.example/webhook/abc' } }],
+			staticData,
+		});
+
+		const result = await new UptimeifyTrigger().webhookMethods.default.checkExists.call(context);
+
+		expect(result).toBe(false);
+		expect(staticData.channelId).toBeUndefined();
+	});
+});
+
+describe('UptimeifyTrigger.create', () => {
+	it('throws a clear error instead of registering a channel with an undefined URL', async () => {
+		const node = createFakeNode();
+		const staticData: IDataObject = {};
+
+		const fakeContext = {
+			getNode: () => node,
+			getNodeWebhookUrl: () => undefined,
+			getWorkflowStaticData: () => staticData,
+		};
+
+		await expect(
+			new UptimeifyTrigger().webhookMethods.default.create.call(
+				fakeContext as unknown as IHookFunctions,
+			),
+		).rejects.toThrow();
+
+		expect(staticData.channelId).toBeUndefined();
+		expect(staticData.secret).toBeUndefined();
+	});
+});
