@@ -6,7 +6,7 @@ import type {
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
-import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { extractItems, uptimeifyApiRequest } from '../Uptimeify/shared/transport';
 import { createWebhookSecret, isValidSignature } from './shared/signature';
 
@@ -165,11 +165,25 @@ export class UptimeifyTrigger implements INodeType {
 
 				if (channelId === undefined) return true;
 
-				await uptimeifyApiRequest.call(
-					this,
-					'DELETE',
-					`/api/notification-channels/${String(channelId)}`,
-				);
+				try {
+					await uptimeifyApiRequest.call(
+						this,
+						'DELETE',
+						`/api/notification-channels/${String(channelId)}`,
+					);
+				} catch (error) {
+					// A channel that is already gone - deleted from the Uptimeify UI, or left behind by a
+					// previous deactivation that failed after the remote delete but before this ran -
+					// counts as success. Anything else (403, network error, ...) probably means the
+					// channel still exists, so it must keep surfacing instead of silently forgetting the
+					// ID and leaking the channel.
+					if (!(error instanceof NodeApiError) || error.httpCode !== '404') {
+						// `error` is already a NodeApiError here in every real case (uptimeifyApiRequest
+						// wraps everything it throws), and the constructor hands back that same instance
+						// unchanged - this is not a second, redundant wrap.
+						throw new NodeApiError(this.getNode(), error as never);
+					}
+				}
 
 				delete webhookData.channelId;
 				delete webhookData.secret;
