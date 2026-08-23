@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-base.uptimeifyTrigger",
+	"node": "@haupt-pascal/n8n-nodes-uptimeify",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Development", "Developer Tools"],
