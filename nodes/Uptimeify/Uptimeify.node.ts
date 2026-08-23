@@ -20,10 +20,16 @@ import { customerIpDescription } from './resources/customerIp';
 import { executeCustomerIp } from './resources/customerIp/execute';
 import { incidentDescription } from './resources/incident';
 import { executeIncident } from './resources/incident/execute';
+import { maintenanceWindowDescription } from './resources/maintenanceWindow';
+import { executeMaintenanceWindow } from './resources/maintenanceWindow/execute';
 import { monitorDescription } from './resources/monitor';
 import { executeMonitor } from './resources/monitor/execute';
+import { notificationChannelDescription } from './resources/notificationChannel';
+import { executeNotificationChannel } from './resources/notificationChannel/execute';
 import { statusPageDescription } from './resources/statusPage';
 import { executeStatusPage } from './resources/statusPage/execute';
+import { tagDescription } from './resources/tag';
+import { executeTag } from './resources/tag/execute';
 import { websiteDescription } from './resources/website';
 import { executeWebsite } from './resources/website/execute';
 import type { ResourceExecute } from './shared/types';
@@ -33,8 +39,11 @@ const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
 	customerDomain: executeCustomerDomain,
 	customerIp: executeCustomerIp,
 	incident: executeIncident,
+	maintenanceWindow: executeMaintenanceWindow,
 	monitor: executeMonitor,
+	notificationChannel: executeNotificationChannel,
 	statusPage: executeStatusPage,
+	tag: executeTag,
 	website: executeWebsite,
 };
 
@@ -63,8 +72,11 @@ export class Uptimeify implements INodeType {
 					{ name: 'Customer Domain', value: 'customerDomain' },
 					{ name: 'Customer IP', value: 'customerIp' },
 					{ name: 'Incident', value: 'incident' },
+					{ name: 'Maintenance Window', value: 'maintenanceWindow' },
 					{ name: 'Monitor', value: 'monitor' },
+					{ name: 'Notification Channel', value: 'notificationChannel' },
 					{ name: 'Status Page', value: 'statusPage' },
+					{ name: 'Tag', value: 'tag' },
 					{ name: 'Website', value: 'website' },
 				],
 				default: 'website',
@@ -73,8 +85,11 @@ export class Uptimeify implements INodeType {
 			...customerDomainDescription,
 			...customerIpDescription,
 			...incidentDescription,
+			...maintenanceWindowDescription,
 			...monitorDescription,
+			...notificationChannelDescription,
 			...statusPageDescription,
+			...tagDescription,
 			...websiteDescription,
 		],
 	};
