@@ -71,6 +71,10 @@ body). A request that does not verify is answered with 401 and does not start th
 Scope the channel to the whole organization, to one customer, or to a single website. A
 website-level override additionally needs the parent channel's ID.
 
+**Events** picks which notification types start the workflow: Alert, Recovery, Reminder, Slow,
+Unstable and Warning. Leave it empty and every type starts the workflow; select some and anything
+else is acknowledged without a run.
+
 ## Uptimeify Tools
 
 Rate limits are counted per IP: 120 requests per minute across the endpoint, and 15 to 30 per
