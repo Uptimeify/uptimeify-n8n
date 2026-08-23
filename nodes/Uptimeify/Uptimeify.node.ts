@@ -18,6 +18,10 @@ import { customerDomainDescription } from './resources/customerDomain';
 import { executeCustomerDomain } from './resources/customerDomain/execute';
 import { customerIpDescription } from './resources/customerIp';
 import { executeCustomerIp } from './resources/customerIp/execute';
+import { imIncidentDescription } from './resources/imIncident';
+import { executeImIncident } from './resources/imIncident/execute';
+import { imOnCallDescription } from './resources/imOnCall';
+import { executeImOnCall } from './resources/imOnCall/execute';
 import { incidentDescription } from './resources/incident';
 import { executeIncident } from './resources/incident/execute';
 import { maintenanceWindowDescription } from './resources/maintenanceWindow';
@@ -38,6 +42,8 @@ const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
 	customer: executeCustomer,
 	customerDomain: executeCustomerDomain,
 	customerIp: executeCustomerIp,
+	imIncident: executeImIncident,
+	imOnCall: executeImOnCall,
 	incident: executeIncident,
 	maintenanceWindow: executeMaintenanceWindow,
 	monitor: executeMonitor,
@@ -72,6 +78,8 @@ export class Uptimeify implements INodeType {
 					{ name: 'Customer Domain', value: 'customerDomain' },
 					{ name: 'Customer IP', value: 'customerIp' },
 					{ name: 'Incident', value: 'incident' },
+					{ name: 'Incident Management: Incident', value: 'imIncident' },
+					{ name: 'Incident Management: On-Call', value: 'imOnCall' },
 					{ name: 'Maintenance Window', value: 'maintenanceWindow' },
 					{ name: 'Monitor', value: 'monitor' },
 					{ name: 'Notification Channel', value: 'notificationChannel' },
@@ -85,6 +93,8 @@ export class Uptimeify implements INodeType {
 			...customerDomainDescription,
 			...customerIpDescription,
 			...incidentDescription,
+			...imIncidentDescription,
+			...imOnCallDescription,
 			...maintenanceWindowDescription,
 			...monitorDescription,
 			...notificationChannelDescription,
