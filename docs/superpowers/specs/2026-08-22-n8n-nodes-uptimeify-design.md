@@ -157,6 +157,14 @@ Request-Body (`dnsConfig`, `icmpConfig`, `config`, `smtpConfig`, `sshConfig`, `f
 `imapPopConfig`). Typ-spezifische Felder (`checkMode` für SMTP/SSH/FTP/IMAP-POP, `port`,
 `dnsConfig.rrtypes`) erscheinen über `displayOptions` nur beim passenden Typ.
 
+**Nachtrag aus der Umsetzung (Task 7):** `checkMode` ist beim Anlegen ein eigenes Feld, beim
+Ändern liegt es in der Sammlung und wird nur mitgeschickt, wenn der Nutzer es bewusst setzt.
+Sonst kippt jedes Update eines Monitors im TCP-Modus ihn still zurück auf `protocol`. Ob ein
+Konfigurationsobjekt mitgeht, entscheidet die ausgefüllte Options-Sammlung, nicht die Anwesenheit
+von `checkMode`; nur ein ausdrückliches `checkMode: tcp` unterdrückt es. Die DNS-Erwartungswerte
+werden vor dem Request geprüft: doppelter RR-Type, leere Werteliste und ein ausgewählter RR-Type
+ohne Zeile werfen einen `NodeOperationError` statt in einen rohen 400 zu laufen.
+
 **Korrektur gegenüber der ersten Fassung dieser Spec:** Endpunkte `/api/domain-monitors` und
 `/api/dnsbl-monitors` existieren nicht. Der Doku-Export `llms-full.txt` legt das nahe, das
 Routen-Verzeichnis `monitoring-app/server/api/` kennt sie nicht. Domain-Expiry läuft über
