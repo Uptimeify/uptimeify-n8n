@@ -167,6 +167,61 @@ describe('buildConfig - dns', () => {
 		expect((caught as NodeOperationError).message).toContain('MX');
 		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
 	});
+
+	it('on create, still throws for the untouched defaults (RR Types default A, no Expected Values row)', () => {
+		// RR Types and Match Mode carry non-empty defaults, so they're "present" even when the
+		// user never opens the DNS fields at all. Create must still require a matching row.
+		const context = createContext({
+			rrtypes: ['A'],
+			matchMode: 'exact',
+			expectedValues: {},
+			dnsOptions: {},
+		});
+
+		let caught: unknown;
+		try {
+			buildConfig(context, 'dns', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('A');
+	});
+
+	it('on update, returns undefined without throwing when Expected Values is untouched', () => {
+		// Same untouched-defaults shape as above, but for an update: renaming a DNS monitor
+		// without touching any DNS field must not throw and must not build a config to send.
+		const context = createContext({
+			rrtypes: ['A'],
+			matchMode: 'exact',
+			expectedValues: {},
+			dnsOptions: {},
+		});
+
+		const config = buildConfig(context, 'dns', ITEM_INDEX, 'update');
+
+		expect(config).toBeUndefined();
+	});
+
+	it('on update, still builds and validates the config once Expected Values has a row', () => {
+		const context = createContext({
+			rrtypes: ['A', 'MX'],
+			matchMode: 'exact',
+			expectedValues: { value: [{ rrtype: 'A', values: '1.2.3.4' }] },
+			dnsOptions: {},
+		});
+
+		let caught: unknown;
+		try {
+			buildConfig(context, 'dns', ITEM_INDEX, 'update');
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('MX');
+	});
 });
 
 describe('executeMonitor - config on update', () => {
@@ -229,5 +284,44 @@ describe('executeMonitor - config on update', () => {
 
 		expect(calls).toHaveLength(1);
 		expect(calls[0].body).toHaveProperty('dnsConfig');
+	});
+
+	it('sends no dnsConfig, and does not throw, when renaming a DNS monitor without touching its DNS fields', async () => {
+		const { context, calls } = createExecuteContext({
+			monitorType: 'dns',
+			commonFields: { name: 'renamed' },
+			monitorId: 'mon_1',
+			// RR Types and Match Mode keep their non-empty defaults even when the user never opens
+			// the DNS fields; Expected Values stays genuinely empty, which is the update flow's
+			// signal that the DNS matching config was not (re-)supplied.
+			rrtypes: ['A'],
+			matchMode: 'exact',
+			expectedValues: {},
+			dnsOptions: {},
+		});
+
+		await executeMonitor.call(context, 'update', ITEM_INDEX);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].body).not.toHaveProperty('dnsConfig');
+	});
+
+	it('creating a DNS monitor still requires a matching Expected Values row for every RR type', async () => {
+		const { context, calls } = createExecuteContext({
+			monitorType: 'dns',
+			commonFields: {},
+			customerId: 'cust_1',
+			name: 'example',
+			hostname: 'example.com',
+			rrtypes: ['A'],
+			matchMode: 'exact',
+			expectedValues: {},
+			dnsOptions: {},
+		});
+
+		await expect(executeMonitor.call(context, 'create', ITEM_INDEX)).rejects.toBeInstanceOf(
+			NodeOperationError,
+		);
+		expect(calls).toHaveLength(0);
 	});
 });

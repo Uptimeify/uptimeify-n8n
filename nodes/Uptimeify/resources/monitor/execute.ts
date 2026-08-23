@@ -7,15 +7,35 @@ import type { ResourceExecute } from '../../shared/types';
 
 type ExpectedValueEntry = { rrtype: string; values: string };
 
-/** Builds the type-specific config object under its own key, e.g. `dnsConfig` for DNS. */
+/**
+ * Builds the type-specific config object under its own key, e.g. `dnsConfig` for DNS.
+ *
+ * `operation` defaults to `'create'` so existing callers that only care about the validation
+ * behaviour (and every current test) keep exercising the strict, always-build path.
+ */
 export function buildConfig(
 	context: IExecuteFunctions,
 	monitorType: string,
 	itemIndex: number,
+	operation: string = 'create',
 ): IDataObject | undefined {
 	if (monitorType === 'dns') {
 		const entries = ((context.getNodeParameter('expectedValues', itemIndex) as IDataObject).value ??
 			[]) as unknown as ExpectedValueEntry[];
+
+		if (operation === 'update' && entries.length === 0) {
+			// DNS's fields are top-level rather than tucked into one options collection, so there's
+			// no single "did the user touch this" object to check the way the credentialed types do.
+			// Expected Values is the one field every valid dnsConfig must have at least one row in -
+			// RR Types and Match Mode both carry non-empty defaults ('A' / 'exact'), so they're always
+			// "present" whether or not the user opened them, but Expected Values starts genuinely
+			// empty and only gains a row when the user adds one. So its presence is used as the
+			// signal that the user is actually (re-)supplying the DNS matching config; an empty
+			// Expected Values on update means the user left the whole DNS block alone (e.g. only
+			// renamed the monitor), and no dnsConfig should be sent at all.
+			return undefined;
+		}
+
 		const rrtypes = context.getNodeParameter('rrtypes', itemIndex) as string[];
 
 		const expectedValues: IDataObject = {};
@@ -134,7 +154,7 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		// the user isn't editing the config, so nothing about it should be sent. This keys off the
 		// options the user actually filled in, not off whether `checkMode` happened to be included.
 		if (body.checkMode !== 'tcp') {
-			const config = buildConfig(this, monitorType, itemIndex);
+			const config = buildConfig(this, monitorType, itemIndex, operation);
 			if (config !== undefined) body[MONITOR_CONFIG_KEYS[monitorType]] = config;
 		}
 
