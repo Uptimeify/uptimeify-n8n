@@ -3,6 +3,15 @@ import { NodeOperationError } from 'n8n-workflow';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
+const MAX_BULK_CUSTOMER_IDS = 200;
+
+function splitList(raw: string): string[] {
+	return raw
+		.split(',')
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== '');
+}
+
 export const executeCustomer: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
 		const body: IDataObject = {
@@ -35,11 +44,31 @@ export const executeCustomer: ResourceExecute = async function (this, operation,
 	}
 
 	if (operation === 'bulk') {
-		const ids = (this.getNodeParameter('bulkCustomerIds', itemIndex) as string)
-			.split(',')
-			.map((id) => id.trim())
-			.filter((id) => id !== '')
-			.map((id) => Number(id));
+		const entries = splitList(this.getNodeParameter('bulkCustomerIds', itemIndex) as string);
+
+		if (entries.length === 0) {
+			throw new NodeOperationError(this.getNode(), 'Customer IDs list is empty', { itemIndex });
+		}
+
+		if (entries.length > MAX_BULK_CUSTOMER_IDS) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Customer IDs list has ${entries.length} entries; at most ${MAX_BULK_CUSTOMER_IDS} are allowed`,
+				{ itemIndex },
+			);
+		}
+
+		const ids = entries.map((entry) => {
+			const id = Number(entry);
+			if (!Number.isInteger(id) || id <= 0) {
+				throw new NodeOperationError(
+					this.getNode(),
+					`Customer ID "${entry}" is not a positive integer`,
+					{ itemIndex },
+				);
+			}
+			return id;
+		});
 
 		const body: IDataObject = {
 			action: this.getNodeParameter('bulkAction', itemIndex) as string,

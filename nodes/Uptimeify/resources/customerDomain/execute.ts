@@ -10,8 +10,10 @@ export const executeCustomerDomain: ResourceExecute = async function (this, oper
 		}) as string;
 
 		const body: IDataObject = {
-			domainName: this.getNodeParameter('domainName', itemIndex) as string,
 			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+			// Set after the spread so the required top-level field always wins, even if the
+			// user also filled in the collection's "Only used when updating" Domain Name option.
+			domainName: this.getNodeParameter('domainName', itemIndex) as string,
 		};
 
 		return (await uptimeifyApiRequest.call(
