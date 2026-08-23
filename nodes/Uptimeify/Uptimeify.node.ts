@@ -12,6 +12,12 @@ import { getMonitors } from './listSearch/getMonitors';
 import { getTags } from './listSearch/getTags';
 import { getTeams } from './listSearch/getTeams';
 import { getWebsites } from './listSearch/getWebsites';
+import { customerDescription } from './resources/customer';
+import { executeCustomer } from './resources/customer/execute';
+import { customerDomainDescription } from './resources/customerDomain';
+import { executeCustomerDomain } from './resources/customerDomain/execute';
+import { customerIpDescription } from './resources/customerIp';
+import { executeCustomerIp } from './resources/customerIp/execute';
 import { monitorDescription } from './resources/monitor';
 import { executeMonitor } from './resources/monitor/execute';
 import { websiteDescription } from './resources/website';
@@ -19,6 +25,9 @@ import { executeWebsite } from './resources/website/execute';
 import type { ResourceExecute } from './shared/types';
 
 const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
+	customer: executeCustomer,
+	customerDomain: executeCustomerDomain,
+	customerIp: executeCustomerIp,
 	monitor: executeMonitor,
 	website: executeWebsite,
 };
@@ -44,11 +53,17 @@ export class Uptimeify implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{ name: 'Customer', value: 'customer' },
+					{ name: 'Customer Domain', value: 'customerDomain' },
+					{ name: 'Customer IP', value: 'customerIp' },
 					{ name: 'Monitor', value: 'monitor' },
 					{ name: 'Website', value: 'website' },
 				],
 				default: 'website',
 			},
+			...customerDescription,
+			...customerDomainDescription,
+			...customerIpDescription,
 			...monitorDescription,
 			...websiteDescription,
 		],
