@@ -1,0 +1,170 @@
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeProperties,
+	INodeType,
+	INodeTypeDescription,
+	JsonObject,
+} from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { MCP_ENDPOINT, parseMcpBody, readToolResult, TOOL_DEFINITIONS } from './shared/mcp';
+
+function buildArgumentProperties(): INodeProperties[] {
+	const properties: INodeProperties[] = [];
+
+	for (const tool of TOOL_DEFINITIONS) {
+		for (const argument of tool.args) {
+			properties.push({
+				displayName: argument.displayName,
+				name: `${tool.value}_${argument.name}`,
+				type: argument.type,
+				default: argument.type === 'number' ? 0 : '',
+				required: argument.required,
+				placeholder: argument.placeholder,
+				displayOptions: { show: { operation: [tool.value] } },
+			});
+		}
+	}
+
+	return properties;
+}
+
+export class UptimeifyTools implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Uptimeify Tools',
+		name: 'uptimeifyTools',
+		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
+		group: ['transform'],
+		version: 1,
+		subtitle: '={{$parameter["operation"]}}',
+		description: 'Run Uptimeify public network checks. No account and no credentials needed.',
+		defaults: { name: 'Uptimeify Tools' },
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		properties: [
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				options: TOOL_DEFINITIONS.map((tool) => ({
+					name: tool.name,
+					value: tool.value,
+					description: tool.description,
+					action: tool.description,
+				})),
+				default: 'website_status',
+			},
+			...buildArgumentProperties(),
+		],
+	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const operation = this.getNodeParameter('operation', i) as string;
+				const tool = TOOL_DEFINITIONS.find((entry) => entry.value === operation);
+
+				if (tool === undefined) {
+					throw new NodeOperationError(this.getNode(), `Unknown tool "${operation}"`, {
+						itemIndex: i,
+					});
+				}
+
+				const args: IDataObject = {};
+
+				for (const argument of tool.args) {
+					const value = this.getNodeParameter(`${tool.value}_${argument.name}`, i) as
+						| string
+						| number;
+
+					if (value === '' || value === 0) {
+						if (argument.required) {
+							throw new NodeOperationError(
+								this.getNode(),
+								`"${argument.displayName}" is required for ${tool.name}`,
+								{ itemIndex: i },
+							);
+						}
+
+						continue;
+					}
+
+					args[argument.name] = value;
+				}
+
+				const response = await this.helpers.httpRequest({
+					method: 'POST',
+					url: MCP_ENDPOINT,
+					headers: {
+						'Content-Type': 'application/json',
+						Accept: 'application/json, text/event-stream',
+					},
+					body: {
+						jsonrpc: '2.0',
+						id: i + 1,
+						method: 'tools/call',
+						params: { name: tool.value, arguments: args },
+					},
+					json: true,
+					returnFullResponse: true,
+				});
+
+				const parsed = parseMcpBody((response as { body: unknown }).body);
+				const result = readToolResult(parsed);
+
+				if (result.isError) {
+					throw new NodeOperationError(this.getNode(), result.text, { itemIndex: i });
+				}
+
+				returnData.push({
+					json:
+						Object.keys(result.structured).length > 0 ? result.structured : { text: result.text },
+					pairedItem: { item: i },
+				});
+			} catch (error) {
+				const statusCode = (error as { httpCode?: string; statusCode?: number }).statusCode;
+
+				if (statusCode === 429) {
+					const retryAfter = (error as { response?: { body?: { retryAfter?: number } } }).response
+						?.body?.retryAfter;
+
+					const hint =
+						retryAfter === undefined
+							? 'The rate limit was reached. The limits are 120 requests per minute overall and 15 to 30 per minute per tool, counted per IP.'
+							: `The rate limit was reached. Retry in ${retryAfter} seconds.`;
+
+					if (!this.continueOnFail()) {
+						throw new NodeApiError(this.getNode(), error as never, { description: hint });
+					}
+
+					returnData.push({ json: { error: hint }, pairedItem: { item: i } });
+					continue;
+				}
+
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: { error: (error as Error).message },
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
+				// Rewrap to satisfy the lint rule. Constructors return already-typed errors
+				// unchanged, so `itemIndex` only attaches to raw errors.
+				if (error instanceof NodeOperationError) {
+					throw new NodeOperationError(this.getNode(), error, { itemIndex: i });
+				}
+
+				throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
+			}
+		}
+
+		return [returnData];
+	}
+}

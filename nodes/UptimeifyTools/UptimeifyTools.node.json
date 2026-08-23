@@ -1,0 +1,13 @@
+{
+	"node": "n8n-nodes-base.uptimeifyTools",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Developer Tools", "Utility"],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://uptimeify.io/docs/api/mcp"
+			}
+		]
+	}
+}
