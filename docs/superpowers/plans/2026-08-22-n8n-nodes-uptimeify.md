@@ -5606,15 +5606,19 @@ Browser und lässt sich nicht aus dem Repository heraus erledigen.
 - [ ] **Step 3: Repository auf GitHub anlegen und pushen**
 
 ```bash
-gh repo create haupt-pascal/n8n-nodes-uptimeify --public --source=. --remote=origin --push
+# Repository besteht bereits: git@github.com:Uptimeify/uptimeify-n8n.git
+git push origin main
 ```
 
 - [ ] **Step 4: Version taggen und veröffentlichen lassen**
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag 0.1.0
+git push origin 0.1.0
 ```
+
+**Kein `v`-Präfix.** `publish.yml` reagiert auf `tags: ['*.*.*']`; ein Tag `v0.1.0` löst den
+Workflow nicht aus und die Veröffentlichung passiert schlicht nicht.
 
 Anschließend den Workflow-Lauf beobachten:
 
