@@ -258,7 +258,10 @@ describe('executeMonitor - config on update', () => {
 	it('sends no config when the type-specific options collection is untouched', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'smtp',
-			commonFields: {},
+			// commonFields carries a real change so this exercises "no smtpConfig when smtpOptions
+			// is untouched" without also tripping the empty-update-body guard - that guard's own
+			// behaviour is covered separately below.
+			commonFields: { name: 'renamed' },
 			monitorId: 'mon_1',
 			smtpOptions: {},
 		});
@@ -323,5 +326,72 @@ describe('executeMonitor - config on update', () => {
 			NodeOperationError,
 		);
 		expect(calls).toHaveLength(0);
+	});
+});
+
+describe('executeMonitor - empty update body guard', () => {
+	const EMPTY_UPDATE_MESSAGE =
+		'Common Fields is empty and no monitor type options were included either. Fill in at ' +
+		'least one field in Common Fields, or fill in the monitor type options (for DNS, add ' +
+		'an Expected Values row), or nothing would change.';
+
+	it('raises when Common Fields is empty and no type-specific options were filled in, and sends no request', async () => {
+		const { context, calls } = createExecuteContext({
+			monitorType: 'icmp',
+			commonFields: {},
+			monitorId: 'mon_1',
+			icmpOptions: {},
+		});
+
+		let caught: unknown;
+		try {
+			await executeMonitor.call(context, 'update', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toBe(EMPTY_UPDATE_MESSAGE);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('raises for a DNS monitor with RR Types supplied but no Expected Values rows and empty Common Fields, and sends no request', async () => {
+		const { context, calls } = createExecuteContext({
+			monitorType: 'dns',
+			commonFields: {},
+			monitorId: 'mon_1',
+			// RR Types was changed from its default, but with no Expected Values row buildConfig
+			// deliberately returns undefined (see buildConfig's dns branch) - so the final body is
+			// empty even though the user did touch a DNS field.
+			rrtypes: ['A', 'MX'],
+			matchMode: 'contains',
+			expectedValues: {},
+			dnsOptions: {},
+		});
+
+		let caught: unknown;
+		try {
+			await executeMonitor.call(context, 'update', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toBe(EMPTY_UPDATE_MESSAGE);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('still sends the request, body untouched, when Common Fields carries a real change', async () => {
+		const { context, calls } = createExecuteContext({
+			monitorType: 'icmp',
+			commonFields: { name: 'renamed' },
+			monitorId: 'mon_1',
+			icmpOptions: {},
+		});
+
+		await executeMonitor.call(context, 'update', ITEM_INDEX);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].body).toEqual({ name: 'renamed' });
 	});
 });

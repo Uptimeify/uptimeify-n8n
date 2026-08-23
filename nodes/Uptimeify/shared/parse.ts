@@ -34,17 +34,24 @@ export function parseJsonParameter(
  * and a PATCH with an empty body reports success on a request that changed nothing. Throws a
  * `NodeOperationError` naming the collection the user should have filled in, matching every
  * other class of user error in this package.
+ *
+ * `message`, when given, replaces the generated `"${fieldName} is empty..."` sentence outright.
+ * It exists for callers - like the monitor resource - whose body is assembled from more than one
+ * collection, where naming a single `fieldName` would not tell the user everywhere they could
+ * have made a change.
  */
 export function assertNonEmptyUpdateBody(
 	context: IExecuteFunctions,
 	body: IDataObject,
 	fieldName: string,
 	itemIndex: number,
+	message?: string,
 ): void {
 	if (Object.keys(body).length === 0) {
 		throw new NodeOperationError(
 			context.getNode(),
-			`${fieldName} is empty. Fill in at least one field to update, or nothing would change.`,
+			message ??
+				`${fieldName} is empty. Fill in at least one field to update, or nothing would change.`,
 			{ itemIndex },
 		);
 	}

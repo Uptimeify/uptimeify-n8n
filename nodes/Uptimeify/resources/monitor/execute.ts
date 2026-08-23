@@ -2,6 +2,7 @@ import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { MONITOR_CONFIG_KEYS, MONITOR_PATHS } from '../../shared/descriptions';
 import { splitList } from '../../shared/lists';
+import { assertNonEmptyUpdateBody } from '../../shared/parse';
 import { uptimeifyApiRequest, uptimeifyApiRequestAllItems } from '../../shared/transport';
 import type { ResourceExecute } from '../../shared/types';
 
@@ -161,6 +162,23 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		if (operation === 'create') {
 			return (await uptimeifyApiRequest.call(this, 'POST', basePath, body)) as IDataObject;
 		}
+
+		// Checked here, after commonFields is spread in and the type-specific config has (or has
+		// not) been attached, so this sees exactly what would be sent. An empty body means either
+		// nothing was touched at all, or - on a DNS monitor - only RR Types/Match Mode were
+		// touched without adding an Expected Values row, which deliberately leaves dnsConfig
+		// unbuilt (see buildConfig above). Either way an empty PATCH would report success on a
+		// change that never happened, so both cases need the same actionable error instead of a
+		// silent no-op.
+		assertNonEmptyUpdateBody(
+			this,
+			body,
+			'Common Fields',
+			itemIndex,
+			'Common Fields is empty and no monitor type options were included either. Fill in at ' +
+				'least one field in Common Fields, or fill in the monitor type options (for DNS, add ' +
+				'an Expected Values row), or nothing would change.',
+		);
 
 		const monitorId = this.getNodeParameter('monitorId', itemIndex, undefined, {
 			extractValue: true,
