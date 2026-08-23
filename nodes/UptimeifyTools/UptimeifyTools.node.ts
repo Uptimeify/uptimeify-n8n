@@ -30,6 +30,40 @@ function buildArgumentProperties(): INodeProperties[] {
 	return properties;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+/**
+ * `this.helpers.httpRequest` rethrows the raw Axios error unmodified on a non-2xx response (see
+ * `@n8n/backend-network`'s `invokeAxios`, which only intercepts a 401 digest-auth challenge and
+ * otherwise does a bare `throw error`). That error carries the status at `error.response.status`,
+ * not `error.statusCode` - n8n-workflow's own `NodeApiError` constructor reads the same property
+ * for an `AxiosError`. `error` may not even be an object, so every step here is defensive.
+ */
+function extractStatusCode(error: unknown): number | undefined {
+	if (!isRecord(error)) return undefined;
+
+	const response = error.response;
+	if (!isRecord(response)) return undefined;
+
+	return typeof response.status === 'number' ? response.status : undefined;
+}
+
+/** On a 429, the endpoint's JSON body - parsed by Axios into `error.response.data` - carries the
+ *  wait hint as `retryAfter`. */
+function extractRetryAfter(error: unknown): number | undefined {
+	if (!isRecord(error)) return undefined;
+
+	const response = error.response;
+	if (!isRecord(response)) return undefined;
+
+	const data = response.data;
+	if (!isRecord(data)) return undefined;
+
+	return typeof data.retryAfter === 'number' ? data.retryAfter : undefined;
+}
+
 export class UptimeifyTools implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Uptimeify Tools',
@@ -128,11 +162,10 @@ export class UptimeifyTools implements INodeType {
 					pairedItem: { item: i },
 				});
 			} catch (error) {
-				const statusCode = (error as { httpCode?: string; statusCode?: number }).statusCode;
+				const statusCode = extractStatusCode(error);
 
 				if (statusCode === 429) {
-					const retryAfter = (error as { response?: { body?: { retryAfter?: number } } }).response
-						?.body?.retryAfter;
+					const retryAfter = extractRetryAfter(error);
 
 					const hint =
 						retryAfter === undefined
@@ -140,7 +173,7 @@ export class UptimeifyTools implements INodeType {
 							: `The rate limit was reached. Retry in ${retryAfter} seconds.`;
 
 					if (!this.continueOnFail()) {
-						throw new NodeApiError(this.getNode(), error as never, { description: hint });
+						throw new NodeApiError(this.getNode(), error as JsonObject, { description: hint });
 					}
 
 					returnData.push({ json: { error: hint }, pairedItem: { item: i } });

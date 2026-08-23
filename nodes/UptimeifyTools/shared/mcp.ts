@@ -181,6 +181,23 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 /* eslint-enable n8n-nodes-base/node-param-default-missing */
 
 /**
+ * Parses a frame (or bare-object string) that is already known to hold JSON. A malformed frame
+ * must still surface the domain-level "Unreadable MCP response" message, with the parser's own
+ * text appended so a debugging user can see what specifically was wrong.
+ */
+function parseJsonFrame(text: string): IDataObject {
+	let parseErrorMessage: string;
+
+	try {
+		return JSON.parse(text) as IDataObject;
+	} catch (error) {
+		parseErrorMessage = (error as Error).message;
+	}
+
+	throw new Error(`Unreadable MCP response: ${parseErrorMessage}`);
+}
+
+/**
  * The endpoint speaks streamable HTTP, so a successful call answers either with a JSON object or
  * with an event stream whose last `data:` frame carries the JSON-RPC response.
  */
@@ -191,7 +208,7 @@ export function parseMcpBody(raw: unknown): IDataObject {
 		const trimmed = raw.trim();
 
 		if (trimmed.startsWith('{')) {
-			return JSON.parse(trimmed) as IDataObject;
+			return parseJsonFrame(trimmed);
 		}
 
 		const frames = trimmed
@@ -201,7 +218,7 @@ export function parseMcpBody(raw: unknown): IDataObject {
 			.map((line) => line.slice('data:'.length).trim());
 
 		const last = frames[frames.length - 1];
-		if (last !== undefined) return JSON.parse(last) as IDataObject;
+		if (last !== undefined) return parseJsonFrame(last);
 	}
 
 	throw new Error('Unreadable MCP response');
@@ -224,11 +241,14 @@ export function readToolResult(rpc: IDataObject): {
 		structuredContent?: IDataObject;
 	};
 
-	const text = result.content?.find((block) => block.type === 'text')?.text ?? '';
+	const isError = result.isError === true;
+	const text = result.content?.find((block) => block.type === 'text')?.text;
 
 	return {
 		structured: result.structuredContent ?? {},
-		isError: result.isError === true,
-		text,
+		isError,
+		// A tool-level error with no text block would otherwise surface as a blank
+		// `NodeOperationError` message, so give it the same kind of fallback as an RPC-level error.
+		text: text ?? (isError ? 'MCP tool call failed' : ''),
 	};
 }
