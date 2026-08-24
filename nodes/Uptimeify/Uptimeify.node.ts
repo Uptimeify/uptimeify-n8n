@@ -66,7 +66,14 @@ export class Uptimeify implements INodeType {
 		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
 		group: ['input'],
 		version: 1,
-		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
+		// `$parameter["operation"]`/`$parameter["resource"]` resolve to their `value`s (e.g.
+		// `getAll`/`imSchedule`), not their `name`s, so the default subtitle behaviour would show
+		// those raw values on the canvas. These inline lookups show the human-readable names
+		// instead, without changing the operation/resource values themselves - the same approach
+		// UptimeifyTools uses. Has to be a plain string literal (not built at runtime) for
+		// n8n-nodes-base/node-class-description-missing-subtitle to recognize it.
+		subtitle:
+			'={{({"assign":"Assign to Monitor","bulk":"Bulk Action","changeStatus":"Change Status","create":"Create","createOverride":"Create Override","delete":"Delete","get":"Get","getAlertHistory":"Get Alert History","getAll":"Get Many","getCheckHistory":"Get Check History","getIncidentHistory":"Get Incident History","getSmsUsage":"Get SMS Usage","getUptimeStats":"Get Uptime Stats","ingestEvent":"Ingest Event","remove":"Remove From Monitor","resolve":"Resolve","test":"Test","triggerCheck":"Trigger Check","update":"Update","updateStatus":"Update Status"})[$parameter["operation"]] + ": " + ({"customer":"Customer","customerDomain":"Customer Domain","customerIp":"Customer IP","imIncident":"Incident Management: Incident","imOnCall":"Incident Management: On-Call","imSchedule":"Incident Management: Schedule","imTeam":"Incident Management: Team","incident":"Incident","maintenanceWindow":"Maintenance Window","monitor":"Monitor","notificationChannel":"Notification Channel","statusPage":"Status Page","tag":"Tag","website":"Website"})[$parameter["resource"]]}}',
 		description: 'Manage monitors, incidents and status pages in Uptimeify',
 		defaults: { name: 'Uptimeify' },
 		usableAsTool: true,
