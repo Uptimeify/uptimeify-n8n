@@ -6,8 +6,9 @@ import type {
 	IHttpRequestOptions,
 	ILoadOptionsFunctions,
 	IWebhookFunctions,
+	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError } from 'n8n-workflow';
+import { NodeApiError, NodeOperationError } from 'n8n-workflow';
 import { describeUptimeifyError } from './errors';
 
 export type UptimeifyContext =
@@ -66,7 +67,27 @@ export async function uptimeifyApiRequest(
 	qs: IDataObject = {},
 ): Promise<unknown> {
 	const credentials = await this.getCredentials('uptimeifyApi');
-	const baseUrl = String(credentials.baseUrl ?? 'https://uptimeify.io').replace(/\/+$/, '');
+	const rawBaseUrl = credentials.baseUrl;
+	// The field is required with this same default, so `??` alone never fires - except for a
+	// user who clears it, which saves an empty string (`'' ?? x` is `''`, not `x`). Trimming
+	// first catches that case, and a whitespace-only value the same way.
+	const trimmedBaseUrl = typeof rawBaseUrl === 'string' ? rawBaseUrl.trim() : '';
+	const candidateBaseUrl = trimmedBaseUrl === '' ? 'https://uptimeify.io' : trimmedBaseUrl;
+
+	let baseUrl: string;
+	try {
+		// A value that is present but not a URL at all (a typo, a stray word) would otherwise
+		// reach the HTTP layer unchecked and fail there as a bare "Invalid URL" with nothing
+		// pointing back at the credential that caused it. Catching it here, before it is used,
+		// lets the error name the field and the bad value instead.
+		new URL(candidateBaseUrl);
+		baseUrl = candidateBaseUrl.replace(/\/+$/, '');
+	} catch {
+		throw new NodeOperationError(
+			this.getNode(),
+			`The Base URL credential value "${candidateBaseUrl}" is not a valid URL. Check the Base URL field on the Uptimeify API credential.`,
+		);
+	}
 
 	const options: IHttpRequestOptions = {
 		method,
@@ -84,7 +105,7 @@ export async function uptimeifyApiRequest(
 		const description = describeUptimeifyError(error);
 		throw new NodeApiError(
 			this.getNode(),
-			error as never,
+			error as JsonObject,
 			description === undefined ? undefined : { description },
 		);
 	}
