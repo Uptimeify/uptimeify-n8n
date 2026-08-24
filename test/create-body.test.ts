@@ -53,11 +53,11 @@ function createExecuteContext(params: Record<string, unknown>): {
 const ITEM_INDEX = 0;
 
 describe('executeStatusPage - create body composition', () => {
-	it('lets the top-level Name and Customer win over a colliding Fields collection entry', async () => {
+	it('lets the top-level Name and Customer win over a colliding Additional Fields collection entry', async () => {
 		const { context, calls } = createExecuteContext({
 			customerId: 'cust_top_level',
 			name: 'Top Level Status Page',
-			fields: {
+			additionalFields: {
 				name: 'STALE-FIELDS-NAME',
 				description: 'Some description',
 			},
@@ -75,7 +75,7 @@ describe('executeStatusPage - create body composition', () => {
 });
 
 describe('executeMonitor - create body composition', () => {
-	it('lets the top-level Name, Hostname and Port win over colliding commonFields entries, while non-colliding commonFields still arrive', async () => {
+	it('lets the top-level Name, Hostname and Port win over colliding Additional Fields entries, while non-colliding Additional Fields still arrive', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'tcp',
 			customerId: 'cust_top_level',
@@ -83,7 +83,7 @@ describe('executeMonitor - create body composition', () => {
 			hostname: 'top-level.example.com',
 			port: 443,
 			tcpOptions: {},
-			commonFields: {
+			additionalFields: {
 				name: 'STALE-COMMON-NAME',
 				hostname: 'stale.example.com',
 				port: 9999,
@@ -99,7 +99,7 @@ describe('executeMonitor - create body composition', () => {
 			hostname: 'top-level.example.com',
 			port: 443,
 			customerId: 'cust_top_level',
-			// Non-colliding commonFields options are not dead weight - they still reach the body.
+			// Non-colliding Additional Fields options are not dead weight - they still reach the body.
 			status: 'maintenance',
 		});
 	});

@@ -12,7 +12,7 @@ export const executeCustomerIp: ResourceExecute = async function (this, operatio
 
 		const body: IDataObject = {
 			ipAddress: this.getNodeParameter('ipAddress', itemIndex) as string,
-			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
 		};
 
 		return (await uptimeifyApiRequest.call(
@@ -48,8 +48,8 @@ export const executeCustomerIp: ResourceExecute = async function (this, operatio
 	}
 
 	if (operation === 'update') {
-		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
-		assertNonEmptyUpdateBody(this, body, 'Fields', itemIndex);
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		assertNonEmptyUpdateBody(this, body, 'Update Fields', itemIndex);
 
 		return (await uptimeifyApiRequest.call(
 			this,

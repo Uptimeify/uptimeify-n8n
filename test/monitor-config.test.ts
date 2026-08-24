@@ -228,7 +228,7 @@ describe('executeMonitor - config on update', () => {
 	it('sends the config for a credentialed type when its options are filled in, even with no checkMode', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'smtp',
-			commonFields: {},
+			updateFields: {},
 			monitorId: 'mon_1',
 			smtpOptions: { user: 'bob', pass: 'secret' },
 		});
@@ -244,7 +244,7 @@ describe('executeMonitor - config on update', () => {
 	it('sends no config when checkMode is explicitly tcp, even with options filled in', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'smtp',
-			commonFields: { checkMode: 'tcp' },
+			updateFields: { checkMode: 'tcp' },
 			monitorId: 'mon_1',
 			smtpOptions: { user: 'bob', pass: 'secret' },
 		});
@@ -258,10 +258,10 @@ describe('executeMonitor - config on update', () => {
 	it('sends no config when the type-specific options collection is untouched', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'smtp',
-			// commonFields carries a real change so this exercises "no smtpConfig when smtpOptions
+			// updateFields carries a real change so this exercises "no smtpConfig when smtpOptions
 			// is untouched" without also tripping the empty-update-body guard - that guard's own
 			// behaviour is covered separately below.
-			commonFields: { name: 'renamed' },
+			updateFields: { name: 'renamed' },
 			monitorId: 'mon_1',
 			smtpOptions: {},
 		});
@@ -275,7 +275,7 @@ describe('executeMonitor - config on update', () => {
 	it('still sends dnsConfig on the DNS path, which has no checkMode at all', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'dns',
-			commonFields: {},
+			updateFields: {},
 			monitorId: 'mon_1',
 			rrtypes: ['A'],
 			matchMode: 'exact',
@@ -292,7 +292,7 @@ describe('executeMonitor - config on update', () => {
 	it('sends no dnsConfig, and does not throw, when renaming a DNS monitor without touching its DNS fields', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'dns',
-			commonFields: { name: 'renamed' },
+			updateFields: { name: 'renamed' },
 			monitorId: 'mon_1',
 			// RR Types and Match Mode keep their non-empty defaults even when the user never opens
 			// the DNS fields; Expected Values stays genuinely empty, which is the update flow's
@@ -312,7 +312,7 @@ describe('executeMonitor - config on update', () => {
 	it('creating a DNS monitor still requires a matching Expected Values row for every RR type', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'dns',
-			commonFields: {},
+			additionalFields: {},
 			customerId: 'cust_1',
 			name: 'example',
 			hostname: 'example.com',
@@ -331,14 +331,14 @@ describe('executeMonitor - config on update', () => {
 
 describe('executeMonitor - empty update body guard', () => {
 	const EMPTY_UPDATE_MESSAGE =
-		'Common Fields is empty and no monitor type options were included either. Fill in at ' +
-		'least one field in Common Fields, or fill in the monitor type options (for DNS, add ' +
+		'Update Fields is empty and no monitor type options were included either. Fill in at ' +
+		'least one field in Update Fields, or fill in the monitor type options (for DNS, add ' +
 		'an Expected Values row), or nothing would change.';
 
-	it('raises when Common Fields is empty and no type-specific options were filled in, and sends no request', async () => {
+	it('raises when Update Fields is empty and no type-specific options were filled in, and sends no request', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'icmp',
-			commonFields: {},
+			updateFields: {},
 			monitorId: 'mon_1',
 			icmpOptions: {},
 		});
@@ -355,10 +355,10 @@ describe('executeMonitor - empty update body guard', () => {
 		expect(calls).toHaveLength(0);
 	});
 
-	it('raises for a DNS monitor with RR Types supplied but no Expected Values rows and empty Common Fields, and sends no request', async () => {
+	it('raises for a DNS monitor with RR Types supplied but no Expected Values rows and empty Update Fields, and sends no request', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'dns',
-			commonFields: {},
+			updateFields: {},
 			monitorId: 'mon_1',
 			// RR Types was changed from its default, but with no Expected Values row buildConfig
 			// deliberately returns undefined (see buildConfig's dns branch) - so the final body is
@@ -381,10 +381,10 @@ describe('executeMonitor - empty update body guard', () => {
 		expect(calls).toHaveLength(0);
 	});
 
-	it('still sends the request, body untouched, when Common Fields carries a real change', async () => {
+	it('still sends the request, body untouched, when Update Fields carries a real change', async () => {
 		const { context, calls } = createExecuteContext({
 			monitorType: 'icmp',
-			commonFields: { name: 'renamed' },
+			updateFields: { name: 'renamed' },
 			monitorId: 'mon_1',
 			icmpOptions: {},
 		});

@@ -11,9 +11,9 @@ export const executeCustomerDomain: ResourceExecute = async function (this, oper
 		}) as string;
 
 		const body: IDataObject = {
-			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
 			// Set after the spread so the required top-level field always wins, even if the
-			// user also filled in the collection's "Only used when updating" Domain Name option.
+			// user also filled in a colliding Additional Fields option.
 			domainName: this.getNodeParameter('domainName', itemIndex) as string,
 		};
 
@@ -50,8 +50,8 @@ export const executeCustomerDomain: ResourceExecute = async function (this, oper
 	}
 
 	if (operation === 'update') {
-		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
-		assertNonEmptyUpdateBody(this, body, 'Fields', itemIndex);
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		assertNonEmptyUpdateBody(this, body, 'Update Fields', itemIndex);
 
 		return (await uptimeifyApiRequest.call(
 			this,

@@ -100,12 +100,56 @@ export const monitorDescription: INodeProperties[] = [
 	},
 
 	{
-		displayName: 'Common Fields',
-		name: 'commonFields',
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: { show: { resource: ['monitor'], operation: WRITE_OPERATIONS } },
+		displayOptions: { show: { resource: ['monitor'], operation: ['create'] } },
+		options: [
+			{
+				displayName: 'Check Interval (Minutes)',
+				name: 'checkInterval',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 1440 },
+				default: 30,
+			},
+			{ displayName: 'Hostname', name: 'hostname', type: 'string', default: '' },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+			{
+				displayName: 'Port',
+				name: 'port',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 65535 },
+				default: 0,
+			},
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Disabled', value: 'disabled' },
+					{ name: 'Maintenance', value: 'maintenance' },
+				],
+				default: 'active',
+			},
+			{
+				displayName: 'Timeout (Seconds)',
+				name: 'timeoutSeconds',
+				type: 'number',
+				typeOptions: { minValue: 1, maxValue: 60 },
+				default: 30,
+			},
+		],
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: { resource: ['monitor'], operation: ['update'] } },
 		options: [
 			{
 				displayName: 'Check Interval (Minutes)',

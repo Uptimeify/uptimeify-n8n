@@ -42,22 +42,42 @@ export const customerDomainDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Fields',
-		name: 'fields',
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: {
-			show: { resource: ['customerDomain'], operation: ['create', 'update'] },
-		},
+		displayOptions: { show: show('create') },
 		options: [
+			{ displayName: 'Expiry Error Days', name: 'expiryErrorDays', type: 'number', default: 7 },
 			{
-				displayName: 'Domain Name',
-				name: 'domainName',
-				type: 'string',
-				default: '',
-				description: 'Only used when updating',
+				displayName: 'Expiry Warning Days',
+				name: 'expiryWarningDays',
+				type: 'number',
+				default: 30,
 			},
+			{ displayName: 'Label', name: 'label', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{ displayName: 'Domain Name', name: 'domainName', type: 'string', default: '' },
 			{ displayName: 'Expiry Error Days', name: 'expiryErrorDays', type: 'number', default: 7 },
 			{
 				displayName: 'Expiry Warning Days',

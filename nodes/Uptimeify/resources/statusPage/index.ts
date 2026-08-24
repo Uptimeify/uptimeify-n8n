@@ -38,12 +38,12 @@ export const statusPageDescription: INodeProperties[] = [
 		displayOptions: { show: { resource: ['statusPage'], operation: ['delete', 'update'] } },
 	},
 	{
-		displayName: 'Fields',
-		name: 'fields',
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: { show: { resource: ['statusPage'], operation: ['create', 'update'] } },
+		displayOptions: { show: show('create') },
 		options: [
 			{
 				displayName: 'Custom Domain Hostname',
@@ -55,12 +55,48 @@ export const statusPageDescription: INodeProperties[] = [
 			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
 			{ displayName: 'Is Published', name: 'isPublished', type: 'boolean', default: true },
 			{
-				displayName: 'Name',
-				name: 'name',
+				displayName: 'Show Recent Incidents',
+				name: 'showRecentIncidents',
+				type: 'boolean',
+				default: false,
+			},
+			{
+				displayName: 'Show Recent Maintenance',
+				name: 'showRecentMaintenance',
+				type: 'boolean',
+				default: false,
+			},
+			{ displayName: 'Slug', name: 'slug', type: 'string', default: '' },
+			{
+				displayName: 'Visibility',
+				name: 'visibility',
+				type: 'options',
+				options: [
+					{ name: 'Customer Members Only', value: 'customer_members_only' },
+					{ name: 'Public', value: 'public' },
+				],
+				default: 'public',
+			},
+		],
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
+		options: [
+			{
+				displayName: 'Custom Domain Hostname',
+				name: 'customDomainHostname',
 				type: 'string',
 				default: '',
-				description: 'Only used when updating',
+				description: 'Creates a pending DNS verification record',
 			},
+			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
+			{ displayName: 'Is Published', name: 'isPublished', type: 'boolean', default: true },
+			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
 			{
 				displayName: 'Show Recent Incidents',
 				name: 'showRecentIncidents',

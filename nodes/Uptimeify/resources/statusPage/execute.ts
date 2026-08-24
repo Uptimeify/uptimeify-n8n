@@ -11,9 +11,9 @@ export const executeStatusPage: ResourceExecute = async function (this, operatio
 		}) as string;
 
 		const body: IDataObject = {
-			...(this.getNodeParameter('fields', itemIndex) as IDataObject),
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
 			// Set after the spread so the required top-level fields always win, even if the
-			// user also filled in the collection's "Only used when updating" Name option.
+			// user also filled in a colliding Additional Fields option.
 			customerId,
 			name: this.getNodeParameter('name', itemIndex) as string,
 		};
@@ -38,8 +38,8 @@ export const executeStatusPage: ResourceExecute = async function (this, operatio
 	const statusPageId = this.getNodeParameter('statusPageId', itemIndex) as string;
 
 	if (operation === 'update') {
-		const body = this.getNodeParameter('fields', itemIndex) as IDataObject;
-		assertNonEmptyUpdateBody(this, body, 'Fields', itemIndex);
+		const body = this.getNodeParameter('updateFields', itemIndex) as IDataObject;
+		assertNonEmptyUpdateBody(this, body, 'Update Fields', itemIndex);
 
 		return (await uptimeifyApiRequest.call(
 			this,

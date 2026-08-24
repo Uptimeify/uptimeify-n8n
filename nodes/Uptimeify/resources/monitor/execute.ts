@@ -123,12 +123,15 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 	}
 
 	if (operation === 'create' || operation === 'update') {
-		const common = this.getNodeParameter('commonFields', itemIndex) as IDataObject;
+		const common = this.getNodeParameter(
+			operation === 'create' ? 'additionalFields' : 'updateFields',
+			itemIndex,
+		) as IDataObject;
 		const body: IDataObject = { ...common };
 
 		if (operation === 'create') {
 			// Set after the spread so the required top-level fields always win, even if the
-			// user also filled in the commonFields collection's Name option.
+			// user also filled in the Additional Fields collection's Name option.
 			body.customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
 				extractValue: true,
 			}) as string;
@@ -141,7 +144,7 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		const isCredentialedType = ['smtp', 'ssh', 'ftp', 'imap-pop'].includes(monitorType);
 
 		if (operation === 'create' && isCredentialedType) {
-			// Only create sends `checkMode` unconditionally; on update it lives in `commonFields`
+			// Only create sends `checkMode` unconditionally; on update it lives in `updateFields`
 			// so a rename or other unrelated change doesn't silently flip the monitor back to
 			// protocol mode (see below).
 			body.checkMode = this.getNodeParameter('checkMode', itemIndex) as string;
@@ -163,7 +166,7 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 			return (await uptimeifyApiRequest.call(this, 'POST', basePath, body)) as IDataObject;
 		}
 
-		// Checked here, after commonFields is spread in and the type-specific config has (or has
+		// Checked here, after updateFields is spread in and the type-specific config has (or has
 		// not) been attached, so this sees exactly what would be sent. An empty body means either
 		// nothing was touched at all, or - on a DNS monitor - only RR Types/Match Mode were
 		// touched without adding an Expected Values row, which deliberately leaves dnsConfig
@@ -173,10 +176,10 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		assertNonEmptyUpdateBody(
 			this,
 			body,
-			'Common Fields',
+			'Update Fields',
 			itemIndex,
-			'Common Fields is empty and no monitor type options were included either. Fill in at ' +
-				'least one field in Common Fields, or fill in the monitor type options (for DNS, add ' +
+			'Update Fields is empty and no monitor type options were included either. Fill in at ' +
+				'least one field in Update Fields, or fill in the monitor type options (for DNS, add ' +
 				'an Expected Values row), or nothing would change.',
 		);
 

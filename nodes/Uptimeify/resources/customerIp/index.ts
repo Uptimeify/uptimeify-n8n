@@ -39,12 +39,44 @@ export const customerIpDescription: INodeProperties[] = [
 		displayOptions: { show: { resource: ['customerIp'], operation: ['delete', 'get', 'update'] } },
 	},
 	{
-		displayName: 'Fields',
-		name: 'fields',
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
 		type: 'collection',
 		placeholder: 'Add Field',
 		default: {},
-		displayOptions: { show: { resource: ['customerIp'], operation: ['create', 'update'] } },
+		displayOptions: { show: show('create') },
+		options: [
+			{
+				displayName: 'IP Family',
+				name: 'ipFamily',
+				type: 'options',
+				options: [
+					{ name: 'IPv4', value: 'v4' },
+					{ name: 'IPv6', value: 'v6' },
+				],
+				default: 'v4',
+				description: 'Inferred from the address when omitted. Has to match the address.',
+			},
+			{ displayName: 'Label', name: 'label', type: 'string', default: '' },
+			{
+				displayName: 'Status',
+				name: 'status',
+				type: 'options',
+				options: [
+					{ name: 'Active', value: 'active' },
+					{ name: 'Inactive', value: 'inactive' },
+				],
+				default: 'active',
+			},
+		],
+	},
+	{
+		displayName: 'Update Fields',
+		name: 'updateFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('update') },
 		options: [
 			{
 				displayName: 'IP Family',
