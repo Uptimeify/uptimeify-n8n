@@ -58,7 +58,7 @@ entity: **On-Call** answers who is currently on call, **Team** lists the teams t
 
 For SMTP, SSH, FTP and IMAP/POP monitors, **Check Mode** decides whether the monitor logs in with
 credentials (`Protocol`) or only checks that the port answers (`TCP`, no credentials stored). On
-**Create** it is a standalone field. On **Update** it instead sits inside the **Common Fields**
+**Create** it is a standalone field. On **Update** it instead sits inside the **Update Fields**
 options collection and is only sent when you deliberately set it there — this keeps a routine edit
 (renaming the monitor, changing its interval, …) from silently flipping it back to `Protocol`
 mode. Likewise, whether a type-specific config object (e.g. **SMTP Options**) is sent on update
