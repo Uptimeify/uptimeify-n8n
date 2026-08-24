@@ -15,6 +15,13 @@ export type ToolDefinition = {
 	value: string;
 	name: string;
 	description: string;
+	/**
+	 * Short verb phrase naming the thing acted on, for n8n's actions panel. Most tool
+	 * descriptions already read that way ("Resolve a domain", "Inspect a TLS certificate"), so
+	 * this is only set where the description is phrased as a clause instead ("Check whether a
+	 * site is up") - see `UptimeifyTools.node.ts`, which falls back to `description` when absent.
+	 */
+	action?: string;
 	args: ToolArgument[];
 };
 
@@ -122,6 +129,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 		value: 'domain_expiry',
 		name: 'Domain Expiry',
 		description: 'Check when a domain expires',
+		action: 'Check domain expiry',
 		args: [domain],
 	},
 	{ value: 'hsts_check', name: 'HSTS Check', description: 'Check the HSTS policy', args: [domain] },
@@ -148,6 +156,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 		value: 'port_check',
 		name: 'Port Check',
 		description: 'Check whether a port answers',
+		action: 'Check a port',
 		args: [host(), port(true)],
 	},
 	{
@@ -173,6 +182,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 		value: 'website_status',
 		name: 'Website Status',
 		description: 'Check whether a site is up',
+		action: 'Check website status',
 		args: [url],
 	},
 	{ value: 'whois', name: 'WHOIS', description: 'Look up WHOIS data', args: [domain] },

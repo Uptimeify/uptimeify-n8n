@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { IExecuteFunctions, INode, INodeExecutionData } from 'n8n-workflow';
+import type { IExecuteFunctions, INode, INodeExecutionData, INodeProperties } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
-import { parseMcpBody, readToolResult } from '../nodes/UptimeifyTools/shared/mcp';
+import { parseMcpBody, readToolResult, TOOL_DEFINITIONS } from '../nodes/UptimeifyTools/shared/mcp';
 import { UptimeifyTools } from '../nodes/UptimeifyTools/UptimeifyTools.node';
 
 describe('parseMcpBody', () => {
@@ -207,5 +207,41 @@ describe('UptimeifyTools.execute - rate limiting', () => {
 		const result = await new UptimeifyTools().execute.call(context);
 
 		expect(result[0]).toHaveLength(1);
+	});
+});
+
+describe('UptimeifyTools.description - subtitle and action', () => {
+	/**
+	 * The node's `subtitle` has to be a plain string literal for the n8n-nodes-base
+	 * "missing subtitle" lint rule to recognize it (a runtime-built expression trips the rule), so
+	 * the value-to-name lookup it embeds is written by hand instead of derived from
+	 * TOOL_DEFINITIONS. This guards that the two never drift apart.
+	 */
+	it('embeds a value-to-name lookup in the subtitle that matches every tool in TOOL_DEFINITIONS', () => {
+		const { subtitle } = new UptimeifyTools().description;
+		const match = (subtitle as string).match(
+			/^=\{\{\((\{.*\})\)\[\$parameter\["operation"\]\]\}\}$/,
+		);
+
+		expect(match).not.toBeNull();
+
+		const embedded = JSON.parse((match as RegExpMatchArray)[1]) as Record<string, string>;
+		const expected = Object.fromEntries(TOOL_DEFINITIONS.map((tool) => [tool.value, tool.name]));
+
+		expect(embedded).toEqual(expected);
+	});
+
+	it("uses each tool's action when set, falling back to its description otherwise", () => {
+		const { properties } = new UptimeifyTools().description;
+		const operationProperty = properties.find(
+			(property) => property.name === 'operation',
+		) as INodeProperties;
+		const options = operationProperty.options as Array<{ value: string; action?: string }>;
+
+		for (const tool of TOOL_DEFINITIONS) {
+			const option = options.find((entry) => entry.value === tool.value);
+
+			expect(option?.action).toBe(tool.action ?? tool.description);
+		}
 	});
 });

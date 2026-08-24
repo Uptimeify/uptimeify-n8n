@@ -71,7 +71,14 @@ export class UptimeifyTools implements INodeType {
 		icon: { light: 'file:../../icons/uptimeify.svg', dark: 'file:../../icons/uptimeify.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["operation"]}}',
+		// `$parameter["operation"]` resolves to the option's `value` (the MCP wire-format tool
+		// name, e.g. `dns_propagation`), not its `name`, so the default subtitle behaviour would show
+		// that raw value on the canvas. This inline lookup shows the human-readable tool name instead,
+		// without changing the operation values themselves. Has to be a plain string literal (not
+		// built at runtime) for n8n-nodes-base/node-class-description-missing-subtitle to recognize it;
+		// its mapping is covered by a test asserting it stays in sync with TOOL_DEFINITIONS.
+		subtitle:
+			'={{({"asn_lookup":"ASN Lookup","check_dns":"Check DNS","check_ssl":"Check SSL","dkim_check":"DKIM Check","dmarc_check":"DMARC Check","dns_propagation":"DNS Propagation","dnsbl_check":"DNSBL Check","domain_expiry":"Domain Expiry","hsts_check":"HSTS Check","http_headers":"HTTP Headers","ip_geolocation":"IP Geolocation","mx_lookup":"MX Lookup","ping_test":"Ping Test","port_check":"Port Check","redirect_check":"Redirect Check","response_time":"Response Time","reverse_dns":"Reverse DNS","spf_check":"SPF Check","website_status":"Website Status","whois":"WHOIS"})[$parameter["operation"]]}}',
 		description: 'Run Uptimeify public network checks. No account and no credentials needed.',
 		defaults: { name: 'Uptimeify Tools' },
 		usableAsTool: true,
@@ -87,7 +94,7 @@ export class UptimeifyTools implements INodeType {
 					name: tool.name,
 					value: tool.value,
 					description: tool.description,
-					action: tool.description,
+					action: tool.action ?? tool.description,
 				})),
 				default: 'website_status',
 			},
