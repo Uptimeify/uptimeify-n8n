@@ -103,7 +103,7 @@ export const notificationChannelDescription: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: show('update') },
 		options: [
-			{ displayName: 'Config (JSON)', name: 'config', type: 'json', default: '{}' },
+			{ displayName: 'Config', name: 'config', type: 'json', default: '{}' },
 			{ displayName: 'Delay (Seconds)', name: 'delaySeconds', type: 'number', default: 0 },
 			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
 			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
