@@ -81,6 +81,12 @@ jobs:
           node-version: 'lts/*'
           cache: 'npm'
 
+      # Trusted publishing (OIDC) needs a recent npm. The version bundled with the
+      # runner's Node can be older than the one that performs the OIDC exchange, and
+      # without it npm never tries and fails with ENEEDAUTH.
+      - name: Use an npm that supports trusted publishing
+        run: 'npm install -g npm@latest'
+
       - name: Install dependencies
         run: 'npm ci'
 
