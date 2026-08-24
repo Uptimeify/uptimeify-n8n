@@ -23,7 +23,7 @@ export const imScheduleDescription: INodeProperties[] = [
 		name: 'scheduleId',
 		type: 'number',
 		typeOptions: { minValue: 1 },
-		default: 1,
+		default: 0,
 		required: true,
 		displayOptions: { show: show('createOverride') },
 	},

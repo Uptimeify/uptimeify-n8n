@@ -84,7 +84,7 @@ export const imIncidentDescription: INodeProperties[] = [
 		name: 'incidentId',
 		type: 'number',
 		typeOptions: { minValue: 1 },
-		default: 1,
+		default: 0,
 		required: true,
 		displayOptions: {
 			show: { resource: ['imIncident'], operation: ['get', 'resolve', 'updateStatus'] },

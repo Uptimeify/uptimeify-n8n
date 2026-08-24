@@ -106,7 +106,7 @@ export const tagDescription: INodeProperties[] = [
 		name: 'assignMonitorId',
 		type: 'number',
 		typeOptions: { minValue: 1 },
-		default: 1,
+		default: 0,
 		required: true,
 		description: 'Numeric monitor ID. This endpoint does not accept public UUIDs.',
 		displayOptions: { show: { resource: ['tag'], operation: ASSIGNMENT } },
