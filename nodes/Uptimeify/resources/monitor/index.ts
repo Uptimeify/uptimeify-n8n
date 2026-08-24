@@ -121,9 +121,13 @@ export const monitorDescription: INodeProperties[] = [
 				name: 'port',
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 65535 },
-				default: 6379,
+				default: 0,
+				// No port fits every monitor type this collection is shared across (a mail port is
+				// wrong for a generic TCP check and vice versa), so there is no default that isn't
+				// misleading for some type - it has to be set explicitly. Leaving the option out
+				// entirely sends no port.
 				description:
-					'Only used for a TCP-mode check; change this to the port you actually want checked',
+					'Only used for a TCP-mode check; there is no default that fits every monitor type, so set this to the port you actually want checked',
 			},
 			{
 				displayName: 'Status',
@@ -185,9 +189,12 @@ export const monitorDescription: INodeProperties[] = [
 				name: 'port',
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 65535 },
-				default: 6379,
+				default: 0,
+				// Same reasoning as the Additional Fields Port above: no single default fits every
+				// monitor type this collection is shared across, so it has to be set explicitly.
+				// Leaving the option out entirely keeps the monitor's current port.
 				description:
-					'Only used for a TCP-mode check; change this to the port you actually want checked',
+					'Only used for a TCP-mode check; there is no default that fits every monitor type, so set this to the port you actually want checked. Leave the option out to keep the current port.',
 			},
 			{
 				displayName: 'Status',
