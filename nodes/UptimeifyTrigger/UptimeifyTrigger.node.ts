@@ -8,6 +8,14 @@ import type {
 	JsonObject,
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { getCustomersNumericId } from '../Uptimeify/listSearch/getCustomersNumericId';
+import { getNotificationChannels } from '../Uptimeify/listSearch/getNotificationChannels';
+import { getWebsitesNumericId } from '../Uptimeify/listSearch/getWebsitesNumericId';
+import {
+	customerNumericLocator,
+	notificationChannelLocator,
+	websiteNumericLocator,
+} from '../Uptimeify/shared/descriptions';
 import { extractItems, uptimeifyApiRequest } from '../Uptimeify/shared/transport';
 import { createWebhookSecret, isValidSignature } from './shared/signature';
 
@@ -49,32 +57,17 @@ export class UptimeifyTrigger implements INodeType {
 				description: 'Which monitors this webhook channel covers',
 			},
 			{
-				displayName: 'Customer ID',
-				name: 'customerId',
-				type: 'number',
-				typeOptions: { minValue: 1 },
-				default: 1,
-				required: true,
-				description: 'Numeric customer ID the channel is scoped to',
+				...customerNumericLocator,
+				description: 'The customer the channel is scoped to',
 				displayOptions: { show: { scope: ['customer', 'website'] } },
 			},
 			{
-				displayName: 'Website ID',
-				name: 'websiteId',
-				type: 'number',
-				typeOptions: { minValue: 1 },
-				default: 1,
-				required: true,
-				description: 'Numeric website ID for a website-level override',
+				...websiteNumericLocator,
+				description: 'The website for a website-level override',
 				displayOptions: { show: { scope: ['website'] } },
 			},
 			{
-				displayName: 'Source Channel ID',
-				name: 'sourceChannelId',
-				type: 'number',
-				typeOptions: { minValue: 1 },
-				default: 1,
-				required: true,
+				...notificationChannelLocator,
 				description: 'Parent channel a website-level override belongs to',
 				displayOptions: { show: { scope: ['website'] } },
 			},
@@ -102,6 +95,14 @@ export class UptimeifyTrigger implements INodeType {
 					'Whether to check the HMAC-SHA256 signature Uptimeify sends. Turn this off only behind a proxy that rewrites the request body.',
 			},
 		],
+	};
+
+	methods = {
+		listSearch: {
+			getCustomersNumericId,
+			getNotificationChannels,
+			getWebsitesNumericId,
+		},
 	};
 
 	webhookMethods = {
@@ -158,13 +159,28 @@ export class UptimeifyTrigger implements INodeType {
 					config: { url: webhookUrl, method: 'POST', secret, timeout: 30 },
 				};
 
+				// customerId/websiteId/sourceChannelId are resource locators, not plain numbers - the
+				// list-search modes hand back a numeric `value`, but the "By ID" mode is a string field
+				// (matching how teamId/tagId work elsewhere), so both need `Number()` after unwrapping.
 				if (scope === 'customer' || scope === 'website') {
-					body.customerId = this.getNodeParameter('customerId') as number;
+					body.customerId = Number(
+						this.getNodeParameter('customerId', undefined, { extractValue: true }) as
+							| string
+							| number,
+					);
 				}
 
 				if (scope === 'website') {
-					body.websiteId = this.getNodeParameter('websiteId') as number;
-					body.sourceChannelId = this.getNodeParameter('sourceChannelId') as number;
+					body.websiteId = Number(
+						this.getNodeParameter('websiteId', undefined, { extractValue: true }) as
+							| string
+							| number,
+					);
+					body.sourceChannelId = Number(
+						this.getNodeParameter('sourceChannelId', undefined, { extractValue: true }) as
+							| string
+							| number,
+					);
 				}
 
 				const created = (await uptimeifyApiRequest.call(

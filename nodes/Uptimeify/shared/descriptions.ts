@@ -90,6 +90,35 @@ export const tagLocator = locator('Tag', 'tagId', 'getTags', 'e.g. 7');
 export const teamLocator = locator('Team', 'teamId', 'getTeams', 'e.g. 3');
 
 /**
+ * `/api/notification-channels` (used by the Uptimeify Trigger to scope its webhook channel) only
+ * accepts numeric IDs, unlike the endpoints the locators above point at, which resolve either the
+ * numeric ID or the public UUID. These three exist purely so the trigger's pickers can hand back
+ * the numeric ID from the same list endpoints as `customerLocator` / `websiteLocator` - they are
+ * not a replacement for those, which the Uptimeify action node depends on returning the UUID. Do
+ * not consolidate them.
+ */
+export const customerNumericLocator = locator(
+	'Customer',
+	'customerId',
+	'getCustomersNumericId',
+	'e.g. 42',
+);
+
+export const websiteNumericLocator = locator(
+	'Website',
+	'websiteId',
+	'getWebsitesNumericId',
+	'e.g. 17',
+);
+
+export const notificationChannelLocator = locator(
+	'Source Channel',
+	'sourceChannelId',
+	'getNotificationChannels',
+	'e.g. 5',
+);
+
+/**
  * The Return All / Limit pair, wired to one resource and operation.
  *
  * `cappedAt`, when given, names the hard ceiling the endpoint itself imposes (it has no
