@@ -281,6 +281,20 @@ describe('uptimeifyApiRequestAllItems - cursor mode', () => {
 		expect(calls).toHaveLength(1);
 		expect(result).toEqual([]);
 	});
+
+	it('stops after one page when nextCursor is present but not a string, even with items returned', async () => {
+		const { context, calls } = createContext(() => ({ items: items(10), nextCursor: 12345 }));
+
+		const result = await uptimeifyApiRequestAllItems.call(
+			context,
+			'/incidents',
+			{},
+			{ mode: 'cursor' },
+		);
+
+		expect(calls).toHaveLength(1);
+		expect(result).toHaveLength(10);
+	});
 });
 
 describe('uptimeifyApiRequestAllItems - array mode', () => {

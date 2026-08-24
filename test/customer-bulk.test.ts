@@ -97,6 +97,64 @@ describe('executeCustomer - bulk', () => {
 		}
 
 		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('Customer IDs list is empty');
+		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('raises naming the offending entry for "0", which is not positive', async () => {
+		const { context, calls } = createExecuteContext({
+			bulkAction: 'archive',
+			bulkCustomerIds: '101,0,103',
+		});
+
+		let caught: unknown;
+		try {
+			await executeCustomer.call(context, 'bulk', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('"0"');
+		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('raises naming the offending entry for a negative number', async () => {
+		const { context, calls } = createExecuteContext({
+			bulkAction: 'archive',
+			bulkCustomerIds: '101,-102,103',
+		});
+
+		let caught: unknown;
+		try {
+			await executeCustomer.call(context, 'bulk', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('"-102"');
+		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('raises naming the offending entry for a decimal number', async () => {
+		const { context, calls } = createExecuteContext({
+			bulkAction: 'archive',
+			bulkCustomerIds: '101,102.5,103',
+		});
+
+		let caught: unknown;
+		try {
+			await executeCustomer.call(context, 'bulk', ITEM_INDEX);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('"102.5"');
 		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
 		expect(calls).toHaveLength(0);
 	});

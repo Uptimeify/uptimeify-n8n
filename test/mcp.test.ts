@@ -99,14 +99,13 @@ describe('readToolResult', () => {
 		expect(readToolResult(rpc)).toEqual({ structured: {}, isError: true, text: 'Invalid params' });
 	});
 
-	it('falls back to a non-blank message for a tool-level error with no text block', () => {
+	it('falls back to a fixed message for a tool-level error with no text block', () => {
 		const rpc = { result: { isError: true, content: [] } };
 
 		const result = readToolResult(rpc);
 
 		expect(result.isError).toBe(true);
-		expect(result.text).not.toBe('');
-		expect(result.text.length).toBeGreaterThan(0);
+		expect(result.text).toBe('MCP tool call failed');
 	});
 });
 

@@ -104,6 +104,7 @@ describe('executeMaintenanceWindow - tags targeting', () => {
 		}
 
 		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('Tag IDs list is empty');
 		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
 		expect(calls).toHaveLength(0);
 	});
@@ -125,6 +126,7 @@ describe('executeMaintenanceWindow - targets (monitors) targeting', () => {
 		}
 
 		expect(caught).toBeInstanceOf(NodeOperationError);
+		expect((caught as NodeOperationError).message).toContain('Targets list is empty');
 		expect((caught as NodeOperationError).context.itemIndex).toBe(ITEM_INDEX);
 		expect(calls).toHaveLength(0);
 	});

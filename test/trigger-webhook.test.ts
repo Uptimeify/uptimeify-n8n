@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { IDataObject, IHookFunctions, INode, IWebhookFunctions } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
 import { UptimeifyTrigger } from '../nodes/UptimeifyTrigger/UptimeifyTrigger.node';
 
 const SECRET = 'top-secret';
@@ -288,9 +289,18 @@ describe('UptimeifyTrigger delete - stale channel handling', () => {
 			throw { message: 'Request failed with status code 403', response: { status: 403 } };
 		}, staticData);
 
-		await expect(
-			new UptimeifyTrigger().webhookMethods.default.delete.call(context),
-		).rejects.toThrow();
+		// Asserted on the actual 403 surviving, not merely "something threw" - a fix that
+		// swallowed the original error and threw a generic one in its place would otherwise
+		// pass this test.
+		let caught: unknown;
+		try {
+			await new UptimeifyTrigger().webhookMethods.default.delete.call(context);
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(NodeApiError);
+		expect((caught as NodeApiError).httpCode).toBe('403');
 
 		expect(staticData.channelId).toBe(42);
 		expect(staticData.secret).toBe('shh');
