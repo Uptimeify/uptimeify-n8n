@@ -7,12 +7,14 @@ import type { ResourceExecute } from '../../shared/types';
 export const executeWebsite: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
 		const body: IDataObject = {
+			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+			// Set after the spread so the required top-level fields always win, even if the
+			// user also filled in a colliding Additional Fields option.
 			customerId: this.getNodeParameter('customerId', itemIndex, undefined, {
 				extractValue: true,
 			}) as string,
 			name: this.getNodeParameter('name', itemIndex) as string,
 			url: this.getNodeParameter('url', itemIndex) as string,
-			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
 		};
 
 		if (typeof body.allowedCheckCountryCodes === 'string') {

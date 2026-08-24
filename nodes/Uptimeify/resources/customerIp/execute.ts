@@ -11,8 +11,10 @@ export const executeCustomerIp: ResourceExecute = async function (this, operatio
 		}) as string;
 
 		const body: IDataObject = {
-			ipAddress: this.getNodeParameter('ipAddress', itemIndex) as string,
 			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
+			// Set after the spread so the required top-level field always wins, even if the
+			// user also filled in a colliding Additional Fields option.
+			ipAddress: this.getNodeParameter('ipAddress', itemIndex) as string,
 		};
 
 		return (await uptimeifyApiRequest.call(
