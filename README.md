@@ -13,7 +13,7 @@ This package adds three nodes:
 ## Installation
 
 Follow the [community nodes installation guide](https://docs.n8n.io/integrations/community-nodes/installation/)
-and install `@haupt-pascal/n8n-nodes-uptimeify`.
+and install `@uptimeify/n8n-nodes-uptimeify`.
 
 ## Credentials
 
