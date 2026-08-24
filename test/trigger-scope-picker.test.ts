@@ -116,4 +116,32 @@ describe('UptimeifyTrigger.create - scope picker unwrapping', () => {
 		expect(body.websiteId).toBeUndefined();
 		expect(body.sourceChannelId).toBeUndefined();
 	});
+
+	// A `NodeOperationError` here - rather than a `Number()`-produced `NaN`/`0`/`null` slipping into
+	// the request body - is what stands between an empty or malformed picker and silently widening
+	// the channel's scope (see AGENTS.md item 1). Both cases below must throw before any request is
+	// made.
+	it('rejects an empty "By ID" selection instead of sending a request', async () => {
+		const { context, calls } = createHookContext({
+			scope: 'customer',
+			customerId: { mode: 'id', value: '' },
+		});
+
+		await expect(
+			new UptimeifyTrigger().webhookMethods.default.create.call(context),
+		).rejects.toThrow(/Customer ".*" is not a positive integer/);
+		expect(calls).toHaveLength(0);
+	});
+
+	it('rejects a pasted UUID instead of coercing it with Number() and sending a request', async () => {
+		const { context, calls } = createHookContext({
+			scope: 'customer',
+			customerId: { mode: 'id', value: '059e1469-0f05-4c93-bd4d-89c45bb2afd9' },
+		});
+
+		await expect(
+			new UptimeifyTrigger().webhookMethods.default.create.call(context),
+		).rejects.toThrow(/Customer "059e1469-0f05-4c93-bd4d-89c45bb2afd9" is not a positive integer/);
+		expect(calls).toHaveLength(0);
+	});
 });

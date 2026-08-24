@@ -19,6 +19,33 @@ import {
 import { extractItems, uptimeifyApiRequest } from '../Uptimeify/shared/transport';
 import { createWebhookSecret, isValidSignature } from './shared/signature';
 
+const PLAIN_DECIMAL_INTEGER = /^[0-9]+$/;
+
+/**
+ * Unwraps a resource locator's value and rejects anything that is not a positive integer,
+ * naming the scope field in the error. The locators' "By ID" mode already carries a regex
+ * validation (see `descriptions.ts`), but that only stops entry in the editor - a value can
+ * still arrive here via an expression, so it's re-checked before being used to build the
+ * request body. A bare `Number(...)` would turn a pasted UUID into `NaN`, which
+ * `JSON.stringify` then turns into `null`, silently widening the channel's scope.
+ */
+function resolveScopeId(context: IHookFunctions, parameterName: string, label: string): number {
+	const raw = context.getNodeParameter(parameterName, undefined, { extractValue: true }) as
+		| string
+		| number;
+	const entry = String(raw);
+	const value = Number(entry);
+
+	if (!PLAIN_DECIMAL_INTEGER.test(entry) || !Number.isInteger(value) || value <= 0) {
+		throw new NodeOperationError(
+			context.getNode(),
+			`${label} "${entry}" is not a positive integer`,
+		);
+	}
+
+	return value;
+}
+
 type ChannelRow = { id: number; config?: { url?: string } };
 
 export class UptimeifyTrigger implements INodeType {
@@ -160,27 +187,17 @@ export class UptimeifyTrigger implements INodeType {
 				};
 
 				// customerId/websiteId/sourceChannelId are resource locators, not plain numbers - the
-				// list-search modes hand back a numeric `value`, but the "By ID" mode is a string field
-				// (matching how teamId/tagId work elsewhere), so both need `Number()` after unwrapping.
+				// list-search modes hand back a numeric `value`, but the "By ID" mode is a plain string
+				// field (matching how teamId/tagId work elsewhere) that carries no server-side guarantee
+				// of what was typed into it, so each one is validated by `resolveScopeId` after
+				// unwrapping rather than trusted and passed straight to `Number()`.
 				if (scope === 'customer' || scope === 'website') {
-					body.customerId = Number(
-						this.getNodeParameter('customerId', undefined, { extractValue: true }) as
-							| string
-							| number,
-					);
+					body.customerId = resolveScopeId(this, 'customerId', 'Customer');
 				}
 
 				if (scope === 'website') {
-					body.websiteId = Number(
-						this.getNodeParameter('websiteId', undefined, { extractValue: true }) as
-							| string
-							| number,
-					);
-					body.sourceChannelId = Number(
-						this.getNodeParameter('sourceChannelId', undefined, { extractValue: true }) as
-							| string
-							| number,
-					);
+					body.websiteId = resolveScopeId(this, 'websiteId', 'Website');
+					body.sourceChannelId = resolveScopeId(this, 'sourceChannelId', 'Source Channel');
 				}
 
 				const created = (await uptimeifyApiRequest.call(

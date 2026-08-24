@@ -1,4 +1,18 @@
-import type { INodeProperties } from 'n8n-workflow';
+import type { INodeProperties, INodePropertyModeValidation } from 'n8n-workflow';
+
+/**
+ * Same shape as `lists.ts`' `PLAIN_DECIMAL_INTEGER` - plain decimal digits only, no exponential
+ * notation, hex, sign or decimal point - so the "By ID" field can't hand back something
+ * `Number()` would silently reinterpret (or, worse, turn a pasted UUID into `NaN`, which
+ * `JSON.stringify` then turns into `null`, POSTing an explicitly null scope).
+ */
+const NUMERIC_ID_VALIDATION: INodePropertyModeValidation = {
+	type: 'regex',
+	properties: {
+		regex: '^[0-9]+$',
+		errorMessage: 'Not a valid numeric ID',
+	},
+};
 
 export const MONITOR_TYPE_OPTIONS = [
 	{ name: 'DNS', value: 'dns' },
@@ -35,6 +49,7 @@ function locator(
 	name: string,
 	searchListMethod: string,
 	idPlaceholder: string,
+	numericId?: boolean,
 ): INodeProperties {
 	return {
 		displayName,
@@ -59,6 +74,7 @@ function locator(
 				name: 'id',
 				type: 'string',
 				placeholder: idPlaceholder,
+				validation: numericId === true ? [NUMERIC_ID_VALIDATION] : undefined,
 			},
 		],
 	};
@@ -85,9 +101,9 @@ export const monitorLocator = locator(
 	'e.g. 3d005a18-fdd8-4dc7-9f26-1a9d409c1bc5',
 );
 
-export const tagLocator = locator('Tag', 'tagId', 'getTags', 'e.g. 7');
+export const tagLocator = locator('Tag', 'tagId', 'getTags', 'e.g. 7', true);
 
-export const teamLocator = locator('Team', 'teamId', 'getTeams', 'e.g. 3');
+export const teamLocator = locator('Team', 'teamId', 'getTeams', 'e.g. 3', true);
 
 /**
  * `/api/notification-channels` (used by the Uptimeify Trigger to scope its webhook channel) only
@@ -102,6 +118,7 @@ export const customerNumericLocator = locator(
 	'customerId',
 	'getCustomersNumericId',
 	'e.g. 42',
+	true,
 );
 
 export const websiteNumericLocator = locator(
@@ -109,6 +126,7 @@ export const websiteNumericLocator = locator(
 	'websiteId',
 	'getWebsitesNumericId',
 	'e.g. 17',
+	true,
 );
 
 export const notificationChannelLocator = locator(
@@ -116,6 +134,7 @@ export const notificationChannelLocator = locator(
 	'sourceChannelId',
 	'getNotificationChannels',
 	'e.g. 5',
+	true,
 );
 
 /**
