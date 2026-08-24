@@ -89,9 +89,23 @@ export const tagLocator = locator('Tag', 'tagId', 'getTags', 'e.g. 7');
 
 export const teamLocator = locator('Team', 'teamId', 'getTeams', 'e.g. 3');
 
-/** The Return All / Limit pair, wired to one resource and operation. */
-export function returnAllProperties(resource: string, operation: string): INodeProperties[] {
+/**
+ * The Return All / Limit pair, wired to one resource and operation.
+ *
+ * `cappedAt`, when given, names the hard ceiling the endpoint itself imposes (it has no
+ * pagination beyond `limit`). It surfaces as a `hint` rather than in `description` because the
+ * n8n-nodes-base lint rules for the `returnAll` and `limit` field names pin `description` to a
+ * fixed string; `hint` is the field meant for exactly this kind of extra, field-specific note,
+ * and it renders right under the control the user is setting - the same place the README's cap
+ * documentation would otherwise be the only place to find it.
+ */
+export function returnAllProperties(
+	resource: string,
+	operation: string,
+	cappedAt?: number,
+): INodeProperties[] {
 	const show = { resource: [resource], operation: [operation] };
+	const hint = cappedAt === undefined ? undefined : `Capped at ${cappedAt} results`;
 
 	return [
 		{
@@ -100,6 +114,7 @@ export function returnAllProperties(resource: string, operation: string): INodeP
 			type: 'boolean',
 			default: false,
 			description: 'Whether to return all results or only up to a given limit',
+			hint,
 			displayOptions: { show },
 		},
 		{
@@ -109,6 +124,7 @@ export function returnAllProperties(resource: string, operation: string): INodeP
 			default: 50,
 			typeOptions: { minValue: 1 },
 			description: 'Max number of results to return',
+			hint,
 			displayOptions: { show: { ...show, returnAll: [false] } },
 		},
 	];

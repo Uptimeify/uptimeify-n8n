@@ -97,16 +97,12 @@ export const executeWebsite: ResourceExecute = async function (this, operation, 
 		const checkType = this.getNodeParameter('checkType', itemIndex) as string;
 		const limit = returnAll ? 200 : (this.getNodeParameter('limit', itemIndex) as number);
 
-		const response = await uptimeifyApiRequest.call(
+		return await uptimeifyApiRequestAllItems.call(
 			this,
-			'GET',
 			`/api/websites/${websiteId}/check-history`,
-			undefined,
 			{ limit: Math.min(limit, 200), checkType },
+			{ mode: 'array', limit: returnAll ? undefined : limit },
 		);
-
-		const rows = (response as { data?: IDataObject[] }).data ?? [];
-		return returnAll ? rows : rows.slice(0, limit);
 	}
 
 	if (operation === 'getUptimeStats') {

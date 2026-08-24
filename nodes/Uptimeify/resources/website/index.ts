@@ -289,7 +289,7 @@ export const websiteDescription: INodeProperties[] = [
 		],
 	},
 
-	...returnAllProperties('website', 'getCheckHistory'),
+	...returnAllProperties('website', 'getCheckHistory', 200),
 	{
 		displayName: 'Check Type',
 		name: 'checkType',

@@ -458,7 +458,7 @@ export const monitorDescription: INodeProperties[] = [
 	},
 
 	...returnAllProperties('monitor', 'getAll'),
-	...returnAllProperties('monitor', 'getCheckHistory'),
-	...returnAllProperties('monitor', 'getAlertHistory'),
-	...returnAllProperties('monitor', 'getIncidentHistory'),
+	...returnAllProperties('monitor', 'getCheckHistory', 200),
+	...returnAllProperties('monitor', 'getAlertHistory', 200),
+	...returnAllProperties('monitor', 'getIncidentHistory', 200),
 ];
