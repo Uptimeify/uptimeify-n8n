@@ -5,6 +5,7 @@ import type {
 	INodeTypeDescription,
 	IWebhookFunctions,
 	IWebhookResponseData,
+	JsonObject,
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { extractItems, uptimeifyApiRequest } from '../Uptimeify/shared/transport';
@@ -207,7 +208,7 @@ export class UptimeifyTrigger implements INodeType {
 						// `error` is already a NodeApiError here in every real case (uptimeifyApiRequest
 						// wraps everything it throws), and the constructor hands back that same instance
 						// unchanged - this is not a second, redundant wrap.
-						throw new NodeApiError(this.getNode(), error as never);
+						throw new NodeApiError(this.getNode(), error as JsonObject);
 					}
 				}
 
