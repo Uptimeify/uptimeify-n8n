@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1
+
+n8n's automated verification scan rejected 0.2.0 over 7 `node-param-default-missing` lint
+errors in the Tools node's shared MCP helper. The scanner runs its own ESLint config and ignores
+inline `eslint-disable` comments, so the existing suppression didn't help.
+
+### Fixed
+
+- The internal tool-argument descriptors in `UptimeifyTools/shared/mcp.ts` were renamed
+  (`name`/`displayName`/`type` -> `key`/`label`/`kind`) so they no longer structurally match n8n's
+  node-parameter shape and trip the rule. No user-visible behavior changed.
+
 ## 0.2.0
 
 Consistency and robustness pass. **This release renames parameters and splits a resource.**

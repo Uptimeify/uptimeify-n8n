@@ -1,6 +1,6 @@
 {
   "name": "@uptimeify/n8n-nodes-uptimeify",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "n8n nodes for Uptimeify: manage monitors, incidents and status pages, react to alerts, and run public network diagnostics",
   "license": "MIT",
   "homepage": "https://uptimeify.io",
