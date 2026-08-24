@@ -31,20 +31,20 @@ The Uptimeify Tools node needs no credentials.
 
 ## Operations
 
-| Resource | Operations |
-| --- | --- |
-| Customer | Create, Get, Get Many, Update, Bulk Action, Get SMS Usage |
-| Customer Domain | Create, Get, Get Many, Update, Delete |
-| Customer IP | Create, Get, Get Many, Update, Delete |
-| Incident | Get, Get Many, Delete |
-| Incident Management: Incident | Ingest Event, Create, Get, Get Many, Update Status, Resolve |
-| Incident Management: On-Call | Who Is on Call, Get Teams, Get Schedules, Create Schedule Override |
-| Maintenance Window | Create, Get, Get Many, Update, Delete, Preview Occurrences |
-| Monitor | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History |
-| Notification Channel | Create, Get Many, Update, Delete, Test |
-| Status Page | Create, Get Many, Update, Delete |
-| Tag | Create, Get Many, Update, Delete, Assign to Monitor, Remove From Monitor |
-| Website | Create, Get, Get Many, Update, Delete, Trigger Check, Change Status, Get Check History, Get Uptime Stats |
+| Resource                      | Operations                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Customer                      | Create, Get, Get Many, Update, Bulk Action, Get SMS Usage                                                        |
+| Customer Domain               | Create, Get, Get Many, Update, Delete                                                                            |
+| Customer IP                   | Create, Get, Get Many, Update, Delete                                                                            |
+| Incident                      | Get, Get Many, Delete                                                                                            |
+| Incident Management: Incident | Ingest Event, Create, Get, Get Many, Update Status, Resolve                                                      |
+| Incident Management: On-Call  | Who Is on Call, Get Teams, Get Schedules, Create Schedule Override                                               |
+| Maintenance Window            | Create, Get, Get Many, Update, Delete, Preview Occurrences                                                       |
+| Monitor                       | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History |
+| Notification Channel          | Create, Get Many, Update, Delete, Test                                                                           |
+| Status Page                   | Create, Get Many, Update, Delete                                                                                 |
+| Tag                           | Create, Get Many, Update, Delete, Assign to Monitor, Remove From Monitor                                         |
+| Website                       | Create, Get, Get Many, Update, Delete, Trigger Check, Change Status, Get Check History, Get Uptime Stats         |
 
 The Monitor resource covers DNS, ICMP, TCP, SMTP, SSH, FTP and IMAP/POP through a single
 **Monitor Type** field. Domain expiry monitoring lives under Customer Domain, DNSBL monitoring
