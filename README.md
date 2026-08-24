@@ -38,7 +38,9 @@ The Uptimeify Tools node needs no credentials.
 | Customer IP                   | Create, Get, Get Many, Update, Delete                                                                            |
 | Incident                      | Get, Get Many, Delete                                                                                            |
 | Incident Management: Incident | Ingest Event, Create, Get, Get Many, Update Status, Resolve                                                      |
-| Incident Management: On-Call  | Who Is on Call, Get Teams, Get Schedules, Create Schedule Override                                               |
+| Incident Management: On-Call  | Get Many                                                                                                         |
+| Incident Management: Schedule | Get Many, Create Override                                                                                        |
+| Incident Management: Team     | Get Many                                                                                                         |
 | Maintenance Window            | Create, Get, Get Many, Update, Delete, Preview Occurrences                                                       |
 | Monitor                       | Create, Get, Get Many, Update, Delete, Trigger Check, Get Check History, Get Alert History, Get Incident History |
 | Notification Channel          | Create, Get Many, Update, Delete, Test                                                                           |
@@ -49,6 +51,10 @@ The Uptimeify Tools node needs no credentials.
 The Monitor resource covers DNS, ICMP, TCP, SMTP, SSH, FTP and IMAP/POP through a single
 **Monitor Type** field. Domain expiry monitoring lives under Customer Domain, DNSBL monitoring
 under Customer IP.
+
+Incident Management's on-call data is split across three resources so each one lists a single
+entity: **On-Call** answers who is currently on call, **Team** lists the teams themselves, and
+**Schedule** lists schedules and creates schedule overrides.
 
 For SMTP, SSH, FTP and IMAP/POP monitors, **Check Mode** decides whether the monitor logs in with
 credentials (`Protocol`) or only checks that the port answers (`TCP`, no credentials stored). On
@@ -68,8 +74,12 @@ Every request is verified against the `X-Webhook-Signature` header (HMAC-SHA256 
 body). A request that does not verify is answered with 401 and does not start the workflow. Turn
 **Verify Signature** off only if a proxy in front of n8n rewrites the request body.
 
-Scope the channel to the whole organization, to one customer, or to a single website. A
-website-level override additionally needs the parent channel's ID.
+Scope the channel to the whole organization, to one customer, or to a single website. Customer,
+Website and Source Channel (the parent channel a website-level override belongs to) are picked
+through the same searchable-list-or-by-ID field the Uptimeify action node uses. The values are not
+interchangeable with the action node's pickers, though: the channel endpoint the trigger calls
+only accepts numeric IDs, so these pickers hand back the numeric ID rather than the public UUID
+the action node's Customer and Website pickers use.
 
 **Events** picks which notification types start the workflow: Alert, Recovery, Reminder, Slow,
 Unstable and Warning. Leave it empty and every type starts the workflow; select some and anything
