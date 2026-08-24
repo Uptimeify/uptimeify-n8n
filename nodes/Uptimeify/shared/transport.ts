@@ -79,8 +79,13 @@ export async function uptimeifyApiRequest(
 		// A value that is present but not a URL at all (a typo, a stray word) would otherwise
 		// reach the HTTP layer unchecked and fail there as a bare "Invalid URL" with nothing
 		// pointing back at the credential that caused it. Catching it here, before it is used,
-		// lets the error name the field and the bad value instead.
-		new URL(candidateBaseUrl);
+		// lets the error name the field and the bad value instead. `new URL(...)` alone also
+		// accepts non-HTTP schemes (`mailto:`, `javascript:`, ...), which would just fail later
+		// with that same bare error, so the protocol is checked too.
+		const parsed = new URL(candidateBaseUrl);
+		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+			throw new Error('not http(s)');
+		}
 		baseUrl = candidateBaseUrl.replace(/\/+$/, '');
 	} catch {
 		throw new NodeOperationError(
