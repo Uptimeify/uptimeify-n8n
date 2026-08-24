@@ -6,17 +6,12 @@ import type { ResourceExecute } from '../../shared/types';
 export const executeIncident: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'getAll') {
 		const returnAll = this.getNodeParameter('returnAll', itemIndex) as boolean;
-		const source = this.getNodeParameter('source', itemIndex) as string;
+		const filters = this.getNodeParameter('filters', itemIndex) as IDataObject;
 
-		return await uptimeifyApiRequestAllItems.call(
-			this,
-			'/api/incidents',
-			{ source },
-			{
-				mode: 'offset',
-				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
-			},
-		);
+		return await uptimeifyApiRequestAllItems.call(this, '/api/incidents', filters, {
+			mode: 'offset',
+			limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
+		});
 	}
 
 	const incidentId = this.getNodeParameter('incidentId', itemIndex) as string;

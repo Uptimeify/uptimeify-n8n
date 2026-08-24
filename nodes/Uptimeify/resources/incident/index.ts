@@ -27,17 +27,26 @@ export const incidentDescription: INodeProperties[] = [
 	},
 	...returnAllProperties('incident', 'getAll'),
 	{
-		displayName: 'Source',
-		name: 'source',
-		type: 'options',
-		options: [
-			{ name: 'Any', value: '' },
-			{ name: 'Manual (Status Page)', value: 'manual' },
-			{ name: 'Monitor', value: 'monitor' },
-		],
-		default: '',
-		description:
-			'Manual incidents can be much older than the newest monitor incidents, so filtering keeps them from falling outside the window',
+		displayName: 'Filters',
+		name: 'filters',
+		type: 'collection',
+		placeholder: 'Add Filter',
+		default: {},
 		displayOptions: { show: show('getAll') },
+		options: [
+			{
+				displayName: 'Source',
+				name: 'source',
+				type: 'options',
+				options: [
+					{ name: 'Any', value: '' },
+					{ name: 'Manual (Status Page)', value: 'manual' },
+					{ name: 'Monitor', value: 'monitor' },
+				],
+				default: '',
+				description:
+					'Manual incidents can be much older than the newest monitor incidents, so filtering keeps them from falling outside the window',
+			},
+		],
 	},
 ];
