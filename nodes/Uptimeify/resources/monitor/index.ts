@@ -121,7 +121,9 @@ export const monitorDescription: INodeProperties[] = [
 				name: 'port',
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 65535 },
-				default: 0,
+				default: 6379,
+				description:
+					'Only used for a TCP-mode check; change this to the port you actually want checked',
 			},
 			{
 				displayName: 'Status',
@@ -183,7 +185,9 @@ export const monitorDescription: INodeProperties[] = [
 				name: 'port',
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 65535 },
-				default: 0,
+				default: 6379,
+				description:
+					'Only used for a TCP-mode check; change this to the port you actually want checked',
 			},
 			{
 				displayName: 'Status',
