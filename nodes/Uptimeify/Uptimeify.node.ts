@@ -22,6 +22,10 @@ import { imIncidentDescription } from './resources/imIncident';
 import { executeImIncident } from './resources/imIncident/execute';
 import { imOnCallDescription } from './resources/imOnCall';
 import { executeImOnCall } from './resources/imOnCall/execute';
+import { imScheduleDescription } from './resources/imSchedule';
+import { executeImSchedule } from './resources/imSchedule/execute';
+import { imTeamDescription } from './resources/imTeam';
+import { executeImTeam } from './resources/imTeam/execute';
 import { incidentDescription } from './resources/incident';
 import { executeIncident } from './resources/incident/execute';
 import { maintenanceWindowDescription } from './resources/maintenanceWindow';
@@ -44,6 +48,8 @@ const RESOURCE_EXECUTORS: Record<string, ResourceExecute> = {
 	customerIp: executeCustomerIp,
 	imIncident: executeImIncident,
 	imOnCall: executeImOnCall,
+	imSchedule: executeImSchedule,
+	imTeam: executeImTeam,
 	incident: executeIncident,
 	maintenanceWindow: executeMaintenanceWindow,
 	monitor: executeMonitor,
@@ -80,6 +86,8 @@ export class Uptimeify implements INodeType {
 					{ name: 'Incident', value: 'incident' },
 					{ name: 'Incident Management: Incident', value: 'imIncident' },
 					{ name: 'Incident Management: On-Call', value: 'imOnCall' },
+					{ name: 'Incident Management: Schedule', value: 'imSchedule' },
+					{ name: 'Incident Management: Team', value: 'imTeam' },
 					{ name: 'Maintenance Window', value: 'maintenanceWindow' },
 					{ name: 'Monitor', value: 'monitor' },
 					{ name: 'Notification Channel', value: 'notificationChannel' },
@@ -95,6 +103,8 @@ export class Uptimeify implements INodeType {
 			...incidentDescription,
 			...imIncidentDescription,
 			...imOnCallDescription,
+			...imScheduleDescription,
+			...imTeamDescription,
 			...maintenanceWindowDescription,
 			...monitorDescription,
 			...notificationChannelDescription,
