@@ -16,10 +16,10 @@ function buildArgumentProperties(): INodeProperties[] {
 	for (const tool of TOOL_DEFINITIONS) {
 		for (const argument of tool.args) {
 			properties.push({
-				displayName: argument.displayName,
-				name: `${tool.value}_${argument.name}`,
-				type: argument.type,
-				default: argument.type === 'number' ? 0 : '',
+				displayName: argument.label,
+				name: `${tool.value}_${argument.key}`,
+				type: argument.kind,
+				default: argument.kind === 'number' ? 0 : '',
 				required: argument.required,
 				placeholder: argument.placeholder,
 				displayOptions: { show: { operation: [tool.value] } },
@@ -120,7 +120,7 @@ export class UptimeifyTools implements INodeType {
 				const args: IDataObject = {};
 
 				for (const argument of tool.args) {
-					const value = this.getNodeParameter(`${tool.value}_${argument.name}`, i) as
+					const value = this.getNodeParameter(`${tool.value}_${argument.key}`, i) as
 						| string
 						| number;
 
@@ -128,7 +128,7 @@ export class UptimeifyTools implements INodeType {
 						if (argument.required) {
 							throw new NodeOperationError(
 								this.getNode(),
-								`"${argument.displayName}" is required for ${tool.name}`,
+								`"${argument.label}" is required for ${tool.name}`,
 								{ itemIndex: i },
 							);
 						}
@@ -136,7 +136,7 @@ export class UptimeifyTools implements INodeType {
 						continue;
 					}
 
-					args[argument.name] = value;
+					args[argument.key] = value;
 				}
 
 				const response = await this.helpers.httpRequest({
