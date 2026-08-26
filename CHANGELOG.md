@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+n8n's manual review of 0.2.1 requires exactly one regular node plus the trigger node per package.
+This release removes the second regular node to comply.
+
+### Breaking
+
+- The **Uptimeify Tools** node is removed. Its 20 tools are now the **Network Diagnostics**
+  resource of the main **Uptimeify** node.
+- Using them now requires an Uptimeify credential to be configured on the node, the same as every
+  other resource. The requests themselves are unchanged and remain unauthenticated — they are
+  sent directly to `uptimeify.io`, ignoring the credential's Base URL.
+
 ## 0.2.1
 
 n8n's automated verification scan rejected 0.2.0 over 7 `node-param-default-missing` lint
