@@ -37,8 +37,7 @@
     "credentials": ["dist/credentials/UptimeifyApi.credentials.js"],
     "nodes": [
       "dist/nodes/Uptimeify/Uptimeify.node.js",
-      "dist/nodes/UptimeifyTrigger/UptimeifyTrigger.node.js",
-      "dist/nodes/UptimeifyTools/UptimeifyTools.node.js"
+      "dist/nodes/UptimeifyTrigger/UptimeifyTrigger.node.js"
     ]
   },
   "devDependencies": {
