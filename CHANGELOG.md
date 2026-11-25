@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.1
+
+Maintenance release that brings the node back in line with the current Uptimeify API.
+
+### Fixed
+
+- **Customer: Bulk** sent the IDs as `customerIds`; the API requires `ids`, so every call failed.
+- **Incident Management: Schedule: Create Override** now sends the required **Type**
+  (Online/Offline). Without it every call failed.
+- **Status Page: Get Many** returned nothing because the list arrives as `{ statusPages }`. The
+  node now requests the `items` envelope.
+- **Customer IP** and **Customer Domain** offered the status `inactive`; the API only knows
+  `active` and `disabled`. The option is now **Disabled**. Workflows that had Inactive selected
+  need the field set again.
+- **Maintenance Window: Get Many** paged a list the API returns whole, which never ended with
+  Return All and 200 or more windows.
+
+### Added
+
+- Schedule override: **Apply Scope** and **Covered By User IDs**.
+- **Expected State** (Up/Down) on TCP monitors (under TCP Options) and on websites, where it
+  applies to heartbeat monitors.
+- Maintenance window target type **TCP**.
+- Status page visibility **Password Protected** and **SSO Members Only**, plus **Access
+  Password**.
+- Error descriptions for `invalidRequestBody` (lists the rejected fields), `expectedStateNotSupported`,
+  `targetHostMonitorLimitReached`, `targetHostPlatformLimitReached` and `monitorAlreadyExists`.
+
+### Removed
+
+Fields the API does not accept and silently dropped:
+
+- **Escalation Policy ID** on Incident Management incident create.
+- **IP Family** on Customer IP update (create keeps it).
+- **Custom Domain Hostname** on Status Page update (create keeps it).
+- **Priority** on Notification Channel create and update.
+
 ## 0.3.0
 
 n8n's manual review of 0.2.1 requires exactly one regular node plus the trigger node per package.
