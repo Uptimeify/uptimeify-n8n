@@ -57,7 +57,7 @@ export const executeCustomer: ResourceExecute = async function (this, operation,
 
 		const body: IDataObject = {
 			action: this.getNodeParameter('bulkAction', itemIndex) as string,
-			customerIds: ids,
+			ids,
 		};
 
 		return (await uptimeifyApiRequest.call(

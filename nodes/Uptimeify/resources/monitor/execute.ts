@@ -96,7 +96,9 @@ export function buildConfig(
 	const parameterName = optionParameter[monitorType];
 	if (parameterName === undefined) return undefined;
 
-	const options = context.getNodeParameter(parameterName, itemIndex) as IDataObject;
+	const options = { ...(context.getNodeParameter(parameterName, itemIndex) as IDataObject) };
+	// Lives in TCP Options for the user, but the API takes it top-level, not inside `config`.
+	delete options.expectedState;
 	if (Object.keys(options).length === 0) return undefined;
 
 	if (monitorType === 'smtp') {
@@ -160,6 +162,11 @@ export const executeMonitor: ResourceExecute = async function (this, operation, 
 		if (body.checkMode !== 'tcp') {
 			const config = buildConfig(this, monitorType, itemIndex, operation);
 			if (config !== undefined) body[MONITOR_CONFIG_KEYS[monitorType]] = config;
+		}
+
+		if (monitorType === 'tcp') {
+			const { expectedState } = this.getNodeParameter('tcpOptions', itemIndex) as IDataObject;
+			if (expectedState !== undefined) body.expectedState = expectedState;
 		}
 
 		if (operation === 'create') {

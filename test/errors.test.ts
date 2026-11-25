@@ -18,6 +18,43 @@ describe('describeUptimeifyError', () => {
 		);
 	});
 
+	it('lists the rejected fields from data.issues for invalidRequestBody', () => {
+		const error = {
+			response: {
+				body: {
+					data: {
+						code: 'invalidRequestBody',
+						issues: [
+							{ path: 'ids', message: 'Invalid input: expected array, received undefined' },
+							{ path: '', message: 'No fields provided' },
+						],
+					},
+				},
+			},
+		};
+
+		expect(describeUptimeifyError(error)).toBe(
+			'The API rejected the request: ids: Invalid input: expected array, received undefined; No fields provided',
+		);
+	});
+
+	it('falls back to a generic text when invalidRequestBody carries no issues', () => {
+		const error = { response: { body: { data: { code: 'invalidRequestBody' } } } };
+
+		expect(describeUptimeifyError(error)).toBe(
+			'The API rejected the request: a field is missing or has the wrong type.',
+		);
+	});
+
+	it.each([
+		'expectedStateNotSupported',
+		'targetHostMonitorLimitReached',
+		'targetHostPlatformLimitReached',
+		'monitorAlreadyExists',
+	])('has a text for %s', (code) => {
+		expect(describeUptimeifyError({ error: { data: { code } } })).toEqual(expect.any(String));
+	});
+
 	it('returns undefined for an unknown code', () => {
 		const error = { response: { body: { data: { code: 'somethingNew' } } } };
 

@@ -21,19 +21,37 @@ export const UPTIMEIFY_ERROR_MESSAGES: Record<string, string> = {
 	payloadTooLarge: 'The event payload is larger than 256 KB.',
 	payloadTooDeep: 'The event payload is nested deeper than 20 levels.',
 	organizationIdRequired: 'The organization could not be resolved from the API token.',
+	invalidRequestBody: 'The API rejected the request: a field is missing or has the wrong type.',
+	expectedStateNotSupported:
+		'Expected State "Down" is only supported for heartbeat and TCP monitors.',
+	targetHostMonitorLimitReached:
+		'Your organization has reached the monitor limit for this target host. Remove monitors for this host or contact support.',
+	targetHostPlatformLimitReached:
+		'This target host has reached the platform-wide monitor limit. Contact support if you need to monitor it.',
+	monitorAlreadyExists: 'This customer already has a monitor of this type for the same target.',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
 
-function readCode(value: unknown): string | undefined {
+function readData(value: unknown): Record<string, unknown> | undefined {
 	if (!isRecord(value)) return undefined;
 
 	const data = value.data;
-	if (isRecord(data) && typeof data.code === 'string') return data.code;
+	return isRecord(data) && typeof data.code === 'string' ? data : undefined;
+}
 
-	return undefined;
+/** `invalidRequestBody` carries `issues: [{ path, message }]` naming the rejected fields. */
+function describeIssues(issues: unknown): string | undefined {
+	if (!Array.isArray(issues)) return undefined;
+
+	const lines = issues
+		.filter(isRecord)
+		.map((issue) => [issue.path, issue.message].filter((part) => part).join(': '))
+		.filter((line) => line !== '');
+
+	return lines.length === 0 ? undefined : `The API rejected the request: ${lines.join('; ')}`;
 }
 
 /**
@@ -53,10 +71,13 @@ export function describeUptimeifyError(error: unknown): string | undefined {
 	];
 
 	for (const candidate of candidates) {
-		const code = readCode(candidate);
-		if (code !== undefined && code in UPTIMEIFY_ERROR_MESSAGES) {
-			return UPTIMEIFY_ERROR_MESSAGES[code];
-		}
+		const data = readData(candidate);
+		if (data === undefined) continue;
+
+		const code = data.code as string;
+		const issues = code === 'invalidRequestBody' ? describeIssues(data.issues) : undefined;
+		if (issues !== undefined) return issues;
+		if (code in UPTIMEIFY_ERROR_MESSAGES) return UPTIMEIFY_ERROR_MESSAGES[code];
 	}
 
 	return undefined;

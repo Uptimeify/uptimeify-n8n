@@ -75,13 +75,6 @@ export const notificationChannelDescription: INodeProperties[] = [
 			{ ...customerLocator, required: false },
 			{ displayName: 'Delay (Seconds)', name: 'delaySeconds', type: 'number', default: 0 },
 			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
-			{
-				displayName: 'Priority',
-				name: 'priority',
-				type: 'number',
-				default: 1,
-				description: 'Lower numbers are higher priority',
-			},
 		],
 	},
 
@@ -107,7 +100,6 @@ export const notificationChannelDescription: INodeProperties[] = [
 			{ displayName: 'Delay (Seconds)', name: 'delaySeconds', type: 'number', default: 0 },
 			{ displayName: 'Is Active', name: 'isActive', type: 'boolean', default: true },
 			{ displayName: 'Name', name: 'name', type: 'string', default: '' },
-			{ displayName: 'Priority', name: 'priority', type: 'number', default: 1 },
 		],
 	},
 	{

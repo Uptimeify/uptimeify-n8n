@@ -351,6 +351,16 @@ export const monitorDescription: INodeProperties[] = [
 				default: '',
 				description: 'String the service has to answer with',
 			},
+			{
+				displayName: 'Expected State',
+				name: 'expectedState',
+				type: 'options',
+				options: [
+					{ name: 'Down', value: 'down', description: 'Alert when the port accepts a connection' },
+					{ name: 'Up', value: 'up', description: 'Alert when the port is not reachable' },
+				],
+				default: 'up',
+			},
 		],
 	},
 	{

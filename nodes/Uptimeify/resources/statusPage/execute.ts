@@ -27,7 +27,8 @@ export const executeStatusPage: ResourceExecute = async function (this, operatio
 		return await uptimeifyApiRequestAllItems.call(
 			this,
 			'/api/status-pages',
-			{},
+			// Without it the endpoint answers `{ statusPages }`, which `extractItems` does not read.
+			{ envelope: 'items' },
 			{
 				mode: 'array',
 				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),

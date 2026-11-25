@@ -101,6 +101,17 @@ export const websiteDescription: INodeProperties[] = [
 				default: 30,
 			},
 			{
+				displayName: 'Expected State',
+				name: 'expectedState',
+				type: 'options',
+				options: [
+					{ name: 'Down', value: 'down', description: 'Alert when a ping arrives' },
+					{ name: 'Up', value: 'up', description: 'Alert when pings stop' },
+				],
+				default: 'up',
+				description: 'Heartbeat monitors only. Other monitoring types accept only Up.',
+			},
+			{
 				displayName: 'Expected Status Codes',
 				name: 'expectedStatusCodes',
 				type: 'string',
@@ -223,6 +234,17 @@ export const websiteDescription: INodeProperties[] = [
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 60 },
 				default: 30,
+			},
+			{
+				displayName: 'Expected State',
+				name: 'expectedState',
+				type: 'options',
+				options: [
+					{ name: 'Down', value: 'down', description: 'Alert when a ping arrives' },
+					{ name: 'Up', value: 'up', description: 'Alert when pings stop' },
+				],
+				default: 'up',
+				description: 'Heartbeat monitors only. Other monitoring types accept only Up.',
 			},
 			{
 				displayName: 'Expected Status Codes',

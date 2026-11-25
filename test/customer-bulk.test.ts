@@ -49,7 +49,7 @@ function createExecuteContext(params: Record<string, unknown>): {
 const ITEM_INDEX = 0;
 
 describe('executeCustomer - bulk', () => {
-	it('sends a numeric customerIds array parsed from a well-formed comma-separated list', async () => {
+	it('sends a numeric ids array parsed from a well-formed comma-separated list', async () => {
 		const { context, calls } = createExecuteContext({
 			bulkAction: 'archive',
 			bulkCustomerIds: ' 101, 102,103 ',
@@ -60,7 +60,7 @@ describe('executeCustomer - bulk', () => {
 		expect(calls).toHaveLength(1);
 		expect(calls[0].body).toEqual({
 			action: 'archive',
-			customerIds: [101, 102, 103],
+			ids: [101, 102, 103],
 		});
 	});
 

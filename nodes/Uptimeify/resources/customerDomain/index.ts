@@ -63,7 +63,7 @@ export const customerDomainDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},
@@ -92,7 +92,7 @@ export const customerDomainDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},
