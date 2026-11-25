@@ -55,7 +55,7 @@ const ITEM_INDEX = 0;
 describe('executeStatusPage - create body composition', () => {
 	it('lets the top-level Name and Customer win over a colliding Additional Fields collection entry', async () => {
 		const { context, calls } = createExecuteContext({
-			customerId: 'cust_top_level',
+			customerId: '12',
 			name: 'Top Level Status Page',
 			additionalFields: {
 				name: 'STALE-FIELDS-NAME',
@@ -68,7 +68,7 @@ describe('executeStatusPage - create body composition', () => {
 		expect(calls).toHaveLength(1);
 		expect(calls[0].body).toMatchObject({
 			name: 'Top Level Status Page',
-			customerId: 'cust_top_level',
+			customerId: 12,
 			description: 'Some description',
 		});
 	});

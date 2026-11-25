@@ -6,17 +6,32 @@ import type { ResourceExecute } from '../../shared/types';
 
 export const executeStatusPage: ResourceExecute = async function (this, operation, itemIndex) {
 	if (operation === 'create') {
-		const customerId = this.getNodeParameter('customerId', itemIndex, undefined, {
-			extractValue: true,
-		}) as string;
+		const customer = String(
+			this.getNodeParameter('customerId', itemIndex, '', { extractValue: true }) ?? '',
+		).trim();
 
 		const body: IDataObject = {
 			...(this.getNodeParameter('additionalFields', itemIndex) as IDataObject),
 			// Set after the spread so the required top-level fields always win, even if the
 			// user also filled in a colliding Additional Fields option.
-			customerId,
 			name: this.getNodeParameter('name', itemIndex) as string,
 		};
+		// A stale customerId from Additional Fields must not survive an empty Customer.
+		delete body.customerId;
+
+		// Unlike most endpoints this one takes only the numeric customer ID, and the Customer
+		// picker hands back the public UUID, so that is looked up first. No customer at all
+		// creates a page of the whole organization.
+		if (/^\d+$/.test(customer)) {
+			body.customerId = Number(customer);
+		} else if (customer !== '') {
+			const found = (await uptimeifyApiRequest.call(
+				this,
+				'GET',
+				`/api/customers/${customer}`,
+			)) as IDataObject;
+			body.customerId = found.id;
+		}
 
 		return (await uptimeifyApiRequest.call(this, 'POST', '/api/status-pages', body)) as IDataObject;
 	}

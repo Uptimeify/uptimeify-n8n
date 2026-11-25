@@ -19,7 +19,12 @@ export const statusPageDescription: INodeProperties[] = [
 		default: 'getAll',
 	},
 
-	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		...customerLocator,
+		required: false,
+		description: 'Leave empty for a page of the whole organization',
+		displayOptions: { show: show('create') },
+	},
 	{
 		displayName: 'Name',
 		name: 'name',

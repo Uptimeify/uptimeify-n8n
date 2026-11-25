@@ -77,7 +77,6 @@ export const customerDomainDescription: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: show('update') },
 		options: [
-			{ displayName: 'Domain Name', name: 'domainName', type: 'string', default: '' },
 			{ displayName: 'Expiry Error Days', name: 'expiryErrorDays', type: 'number', default: 7 },
 			{
 				displayName: 'Expiry Warning Days',

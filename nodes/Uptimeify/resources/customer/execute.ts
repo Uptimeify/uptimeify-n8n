@@ -55,10 +55,16 @@ export const executeCustomer: ResourceExecute = async function (this, operation,
 
 		const ids = parsePositiveIntegers(this, entries, 'Customer ID', itemIndex);
 
-		const body: IDataObject = {
-			action: this.getNodeParameter('bulkAction', itemIndex) as string,
-			ids,
-		};
+		const action = this.getNodeParameter('bulkAction', itemIndex) as string;
+		const body: IDataObject = { action, ids };
+
+		// The API rejects these two actions without their payload field.
+		if (action === 'reports') {
+			body.payload = { enabled: this.getNodeParameter('bulkReportsEnabled', itemIndex) as boolean };
+		}
+		if (action === 'package') {
+			body.payload = { packageId: this.getNodeParameter('bulkPackageId', itemIndex) as number };
+		}
 
 		return (await uptimeifyApiRequest.call(
 			this,

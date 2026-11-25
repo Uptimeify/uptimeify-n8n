@@ -7,6 +7,12 @@ Maintenance release that brings the node back in line with the current Uptimeify
 ### Fixed
 
 - **Customer: Bulk** sent the IDs as `customerIds`; the API requires `ids`, so every call failed.
+- **Customer: Bulk Action** is now a list of the five actions the API has (Activate, Deactivate,
+  Delete, Set Monthly Reports, Set Package) instead of free text, and sends the payload the last
+  two require (**Monthly Reports Enabled**, **Package ID**).
+- **Status Page: Create** sent the customer's UUID, but this endpoint only takes the numeric ID.
+  The node now looks the ID up first. Customer is optional: leave it empty for a page of the
+  whole organization.
 - **Incident Management: Schedule: Create Override** now sends the required **Type**
   (Online/Offline). Without it every call failed.
 - **Status Page: Get Many** returned nothing because the list arrives as `{ statusPages }`. The
@@ -36,6 +42,7 @@ Fields the API does not accept and silently dropped:
 - **IP Family** on Customer IP update (create keeps it).
 - **Custom Domain Hostname** on Status Page update (create keeps it).
 - **Priority** on Notification Channel create and update.
+- **Domain Name** on Customer Domain update.
 
 ## 0.3.0
 

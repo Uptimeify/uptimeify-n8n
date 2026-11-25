@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IExecuteFunctions, IHttpRequestOptions, INodeProperties } from 'n8n-workflow';
+import { customerDescription } from '../nodes/Uptimeify/resources/customer';
 import { customerDomainDescription } from '../nodes/Uptimeify/resources/customerDomain';
 import { customerIpDescription } from '../nodes/Uptimeify/resources/customerIp';
 import { imIncidentDescription } from '../nodes/Uptimeify/resources/imIncident';
@@ -110,6 +111,36 @@ describe('schedule override create', () => {
 	});
 });
 
+describe('status page create customer', () => {
+	it('looks up the numeric id for a customer UUID, which the endpoint does not accept', async () => {
+		const { context, calls } = createExecuteContext(
+			{ customerId: '059e1469-0f05-4c93-bd4d-89c45bb2afd9', name: 'Page', additionalFields: {} },
+			{ id: 77 },
+		);
+
+		await executeStatusPage.call(context, 'create', 0);
+
+		expect(calls).toHaveLength(2);
+		expect(calls[0].url).toBe(
+			'https://uptimeify.test/api/customers/059e1469-0f05-4c93-bd4d-89c45bb2afd9',
+		);
+		expect(calls[1].body).toEqual({ name: 'Page', customerId: 77 });
+	});
+
+	it('sends no customerId for a page of the whole organization', async () => {
+		const { context, calls } = createExecuteContext({
+			customerId: '',
+			name: 'Org Page',
+			additionalFields: {},
+		});
+
+		await executeStatusPage.call(context, 'create', 0);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].body).toEqual({ name: 'Org Page' });
+	});
+});
+
 describe('status page get many', () => {
 	it('asks for the items envelope and returns its rows', async () => {
 		const { context, calls } = createExecuteContext(
@@ -214,6 +245,22 @@ describe('fields the API does not accept are gone', () => {
 	it('ipFamily on customer IP update, while create keeps it', () => {
 		expect(collectionFieldNames(customerIpDescription, 'updateFields')).not.toContain('ipFamily');
 		expect(collectionFieldNames(customerIpDescription, 'additionalFields')).toContain('ipFamily');
+	});
+
+	it('domainName on customer domain update', () => {
+		expect(collectionFieldNames(customerDomainDescription, 'updateFields')).not.toContain(
+			'domainName',
+		);
+	});
+
+	it('customer bulk offers exactly the API actions', () => {
+		expect(optionValues(fields(customerDescription, 'bulkAction')[0]).sort()).toEqual([
+			'activate',
+			'deactivate',
+			'delete',
+			'package',
+			'reports',
+		]);
 	});
 
 	it('customDomainHostname on status page update, while create keeps it', () => {

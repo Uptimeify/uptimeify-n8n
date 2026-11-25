@@ -55,6 +55,13 @@ describe('describeUptimeifyError', () => {
 		expect(describeUptimeifyError({ error: { data: { code } } })).toEqual(expect.any(String));
 	});
 
+	it('names both monitor kinds that support Expected State Down', () => {
+		const text = describeUptimeifyError({ error: { data: { code: 'expectedStateNotSupported' } } });
+
+		expect(text).toContain('heartbeat');
+		expect(text).toContain('TCP monitors');
+	});
+
 	it('returns undefined for an unknown code', () => {
 		const error = { response: { body: { data: { code: 'somethingNew' } } } };
 

@@ -23,7 +23,7 @@ export const UPTIMEIFY_ERROR_MESSAGES: Record<string, string> = {
 	organizationIdRequired: 'The organization could not be resolved from the API token.',
 	invalidRequestBody: 'The API rejected the request: a field is missing or has the wrong type.',
 	expectedStateNotSupported:
-		'Expected State "Down" is only supported for heartbeat and TCP monitors.',
+		'On websites, Expected State "Down" is only supported for the heartbeat monitoring type. TCP monitors (Monitor resource) support it too.',
 	targetHostMonitorLimitReached:
 		'Your organization has reached the monitor limit for this target host. Remove monitors for this host or contact support.',
 	targetHostPlatformLimitReached:
