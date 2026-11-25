@@ -63,7 +63,7 @@ export const customerDomainDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},
@@ -77,7 +77,6 @@ export const customerDomainDescription: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: show('update') },
 		options: [
-			{ displayName: 'Domain Name', name: 'domainName', type: 'string', default: '' },
 			{ displayName: 'Expiry Error Days', name: 'expiryErrorDays', type: 'number', default: 7 },
 			{
 				displayName: 'Expiry Warning Days',
@@ -92,7 +91,7 @@ export const customerDomainDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},

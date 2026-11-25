@@ -64,7 +64,7 @@ export const customerIpDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},
@@ -78,17 +78,6 @@ export const customerIpDescription: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: show('update') },
 		options: [
-			{
-				displayName: 'IP Family',
-				name: 'ipFamily',
-				type: 'options',
-				options: [
-					{ name: 'IPv4', value: 'v4' },
-					{ name: 'IPv6', value: 'v6' },
-				],
-				default: 'v4',
-				description: 'Inferred from the address when omitted. Has to match the address.',
-			},
 			{ displayName: 'Label', name: 'label', type: 'string', default: '' },
 			{
 				displayName: 'Status',
@@ -96,7 +85,7 @@ export const customerIpDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Active', value: 'active' },
-					{ name: 'Inactive', value: 'inactive' },
+					{ name: 'Disabled', value: 'disabled' },
 				],
 				default: 'active',
 			},

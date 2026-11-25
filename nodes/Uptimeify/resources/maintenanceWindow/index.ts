@@ -107,6 +107,7 @@ export const maintenanceWindowDescription: INodeProperties[] = [
 							{ name: 'IMAP/POP', value: 'imap_pop' },
 							{ name: 'SMTP', value: 'smtp' },
 							{ name: 'SSH', value: 'ssh' },
+							{ name: 'TCP', value: 'tcp' },
 							{ name: 'Website', value: 'website' },
 						],
 						default: 'website',

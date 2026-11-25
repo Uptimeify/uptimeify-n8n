@@ -38,6 +38,18 @@ export const imScheduleDescription: INodeProperties[] = [
 		displayOptions: { show: show('createOverride') },
 	},
 	{
+		displayName: 'Type',
+		name: 'type',
+		type: 'options',
+		options: [
+			{ name: 'Offline', value: 'offline', description: 'Takes the user off call' },
+			{ name: 'Online', value: 'online', description: 'Puts the user on call' },
+		],
+		default: 'online',
+		required: true,
+		displayOptions: { show: show('createOverride') },
+	},
+	{
 		displayName: 'Starts At',
 		name: 'startsAt',
 		type: 'dateTime',
@@ -53,6 +65,35 @@ export const imScheduleDescription: INodeProperties[] = [
 		required: true,
 		description: 'Has to be strictly after the start',
 		displayOptions: { show: show('createOverride') },
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: show('createOverride') },
+		options: [
+			{
+				displayName: 'Apply Scope',
+				name: 'applyScope',
+				type: 'options',
+				options: [
+					{ name: 'All Teams', value: 'all_teams' },
+					{ name: 'This Team', value: 'this_team' },
+				],
+				default: 'this_team',
+			},
+			{
+				displayName: 'Covered By User IDs',
+				name: 'coveredByUserIds',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. u_abc123,u_def456',
+				description:
+					'Comma-separated IDs of the users who hold the pager instead. Offline overrides only.',
+			},
+		],
 	},
 	...returnAllProperties('imSchedule', 'getAll'),
 ];

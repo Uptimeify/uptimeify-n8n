@@ -66,17 +66,7 @@ export const imIncidentDescription: INodeProperties[] = [
 		placeholder: 'Add Field',
 		default: {},
 		displayOptions: { show: show('create') },
-		options: [
-			{ ...customerLocator, required: false },
-			{
-				displayName: 'Escalation Policy ID',
-				name: 'escalationPolicyId',
-				type: 'number',
-				typeOptions: { minValue: 1 },
-				default: 1,
-				description: "Omit to use the team's default policy",
-			},
-		],
+		options: [{ ...customerLocator, required: false }],
 	},
 
 	{

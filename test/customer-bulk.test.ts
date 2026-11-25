@@ -49,9 +49,9 @@ function createExecuteContext(params: Record<string, unknown>): {
 const ITEM_INDEX = 0;
 
 describe('executeCustomer - bulk', () => {
-	it('sends a numeric customerIds array parsed from a well-formed comma-separated list', async () => {
+	it('sends a numeric ids array parsed from a well-formed comma-separated list', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: ' 101, 102,103 ',
 		});
 
@@ -59,14 +59,36 @@ describe('executeCustomer - bulk', () => {
 
 		expect(calls).toHaveLength(1);
 		expect(calls[0].body).toEqual({
-			action: 'archive',
-			customerIds: [101, 102, 103],
+			action: 'deactivate',
+			ids: [101, 102, 103],
 		});
+	});
+
+	it('sends the payload the reports and package actions require', async () => {
+		const reports = createExecuteContext({
+			bulkAction: 'reports',
+			bulkCustomerIds: '1',
+			bulkReportsEnabled: false,
+		});
+		await executeCustomer.call(reports.context, 'bulk', ITEM_INDEX);
+		expect(reports.calls[0].body).toEqual({
+			action: 'reports',
+			ids: [1],
+			payload: { enabled: false },
+		});
+
+		const pkg = createExecuteContext({
+			bulkAction: 'package',
+			bulkCustomerIds: '1',
+			bulkPackageId: 9,
+		});
+		await executeCustomer.call(pkg.context, 'bulk', ITEM_INDEX);
+		expect(pkg.calls[0].body).toEqual({ action: 'package', ids: [1], payload: { packageId: 9 } });
 	});
 
 	it('raises naming the offending entry when one is not a positive integer', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: '101,abc,103',
 		});
 
@@ -85,7 +107,7 @@ describe('executeCustomer - bulk', () => {
 
 	it('raises when the entry list is empty (blank or whitespace-only input)', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: '   ',
 		});
 
@@ -104,7 +126,7 @@ describe('executeCustomer - bulk', () => {
 
 	it('raises naming the offending entry for "0", which is not positive', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: '101,0,103',
 		});
 
@@ -123,7 +145,7 @@ describe('executeCustomer - bulk', () => {
 
 	it('raises naming the offending entry for a negative number', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: '101,-102,103',
 		});
 
@@ -142,7 +164,7 @@ describe('executeCustomer - bulk', () => {
 
 	it('raises naming the offending entry for a decimal number', async () => {
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: '101,102.5,103',
 		});
 
@@ -162,7 +184,7 @@ describe('executeCustomer - bulk', () => {
 	it('raises when the list has more than 200 entries, naming the count supplied', async () => {
 		const tooMany = Array.from({ length: 201 }, (_, index) => index + 1).join(',');
 		const { context, calls } = createExecuteContext({
-			bulkAction: 'archive',
+			bulkAction: 'deactivate',
 			bulkCustomerIds: tooMany,
 		});
 

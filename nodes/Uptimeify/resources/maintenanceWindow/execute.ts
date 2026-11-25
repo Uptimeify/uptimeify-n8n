@@ -90,7 +90,8 @@ export const executeMaintenanceWindow: ResourceExecute = async function (
 			'/api/maintenance-windows',
 			{},
 			{
-				mode: 'page',
+				// The endpoint answers with every window at once and ignores page/perPage.
+				mode: 'array',
 				limit: returnAll ? undefined : (this.getNodeParameter('limit', itemIndex) as number),
 			},
 		);

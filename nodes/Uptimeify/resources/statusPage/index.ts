@@ -19,7 +19,12 @@ export const statusPageDescription: INodeProperties[] = [
 		default: 'getAll',
 	},
 
-	{ ...customerLocator, displayOptions: { show: show('create') } },
+	{
+		...customerLocator,
+		required: false,
+		description: 'Leave empty for a page of the whole organization',
+		displayOptions: { show: show('create') },
+	},
 	{
 		displayName: 'Name',
 		name: 'name',
@@ -46,6 +51,14 @@ export const statusPageDescription: INodeProperties[] = [
 		displayOptions: { show: show('create') },
 		options: [
 			{
+				displayName: 'Access Password',
+				name: 'accessPassword',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+				description: 'At least 8 characters. Required with the Password Protected visibility.',
+			},
+			{
 				displayName: 'Custom Domain Hostname',
 				name: 'customDomainHostname',
 				type: 'string',
@@ -73,7 +86,9 @@ export const statusPageDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Customer Members Only', value: 'customer_members_only' },
+					{ name: 'Password Protected', value: 'password_protected' },
 					{ name: 'Public', value: 'public' },
+					{ name: 'SSO Members Only', value: 'sso_members_only' },
 				],
 				default: 'public',
 			},
@@ -88,11 +103,12 @@ export const statusPageDescription: INodeProperties[] = [
 		displayOptions: { show: show('update') },
 		options: [
 			{
-				displayName: 'Custom Domain Hostname',
-				name: 'customDomainHostname',
+				displayName: 'Access Password',
+				name: 'accessPassword',
 				type: 'string',
+				typeOptions: { password: true },
 				default: '',
-				description: 'Creates a pending DNS verification record',
+				description: 'At least 8 characters. Required when switching to Password Protected, unless the page already has a password.',
 			},
 			{ displayName: 'Description', name: 'description', type: 'string', default: '' },
 			{ displayName: 'Is Published', name: 'isPublished', type: 'boolean', default: true },
@@ -116,7 +132,9 @@ export const statusPageDescription: INodeProperties[] = [
 				type: 'options',
 				options: [
 					{ name: 'Customer Members Only', value: 'customer_members_only' },
+					{ name: 'Password Protected', value: 'password_protected' },
 					{ name: 'Public', value: 'public' },
+					{ name: 'SSO Members Only', value: 'sso_members_only' },
 				],
 				default: 'public',
 			},
